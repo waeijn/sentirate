@@ -12,6 +12,7 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.0",
     "@tailwindcss/vite": "^4.2.0",
+    "@types/recharts": "^1.8.29",
     "axios": "^1.13.5",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.574.0",
