@@ -7,9 +7,21 @@ interface MonitoringProps {
   stats: StatCardData[];
   chartData: TrafficPoint[];
   alerts: Alert[];
+  analytics?: {
+    fpr: number;
+    fnr: number;
+    tpr: number;
+    tnr: number;
+    accuracy: number;
+  };
 }
 
-export function Monitoring({ stats, chartData, alerts }: MonitoringProps) {
+export function Monitoring({
+  stats,
+  chartData,
+  alerts,
+  analytics,
+}: MonitoringProps) {
   return (
     <div
       style={{
@@ -36,7 +48,7 @@ export function Monitoring({ stats, chartData, alerts }: MonitoringProps) {
         </p>
       </div>
 
-      {/* Stat cards */}
+      {/* Stat cards — pass analytics only to the acceptance rate card */}
       <div
         style={{
           display: "grid",
@@ -46,7 +58,10 @@ export function Monitoring({ stats, chartData, alerts }: MonitoringProps) {
       >
         {stats.map((s, i) => (
           <div key={i} style={{ animationDelay: `${i * 60}ms` }}>
-            <StatCard data={s} />
+            <StatCard
+              data={s}
+              analytics={s.icon === "acceptance" ? analytics : undefined}
+            />
           </div>
         ))}
       </div>
