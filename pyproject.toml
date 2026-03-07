@@ -1,0 +1,96 @@
+[tool.poetry]
+name = "adaptive-api-rate-limiter"
+version = "0.1.0"
+description = "Adaptive API Rate Limiting Using Heuristic Pattern Classification and Token Bucket Optimization"
+authors = [
+    "John Wayne Landong <johnwaynelandong@gmail.com>",
+    "Terrence John Manlapaz <terrencemanlapazxx@gmail.com>",
+    "Bryan Cuellar <bryancuellar266@gmail.com>",
+    "Benedic Sarmiento <benedicsarmiento712@gmail.com>"
+]
+readme = "README.md"
+license = "MIT"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.109.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+pydantic = "^2.5.0"
+pyyaml = "^6.0.1"
+redis = "^5.0.1"
+python-dotenv = "^1.0.0"
+loguru = "^0.7.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-cov = "^4.1.0"
+pytest-asyncio = "^0.23.2"
+black = "^23.12.1"
+flake8 = "^7.0.0"
+mypy = "^1.8.0"
+isort = "^5.13.2"
+
+[tool.poetry.group.experiments.dependencies]
+# Note: Install locust separately with pip after poetry install
+# pip install locust (requires pyzmq which needs C++ build tools)
+pandas = "^2.2.0"
+numpy = "^2.1.0"
+requests = "^2.31.0"
+
+[tool.poetry.group.evaluation.dependencies]
+pandas = "^2.2.0"
+numpy = "^2.1.0"
+matplotlib = "^3.9.0"
+seaborn = "^0.13.0"
+scikit-learn = "^1.5.0"
+plotly = "^5.18.0"
+scipy = "^1.14.0"
+
+[tool.poetry.group.notebooks.dependencies]
+jupyter = "^1.0.0"
+jupyterlab = "^4.0.0"
+ipykernel = "^6.28.0"
+notebook = "^7.0.0"
+numpy = "^2.1.0"
+pandas = "^2.2.0"
+matplotlib = "^3.9.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --cov=src --cov-report=html --cov-report=term"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | \.mypy_cache
+  | \.pytest_cache
+  | __pycache__
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
