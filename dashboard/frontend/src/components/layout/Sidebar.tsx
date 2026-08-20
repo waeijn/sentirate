@@ -79,7 +79,8 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
       style={{
         width: collapsed ? 64 : "var(--sidebar-w)",
         minHeight: "100vh",
-        background: "var(--bg-panel)",
+        /* ── Figma: sidebar is same black as main background ── */
+        background: "var(--bg)",
         borderRight: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
@@ -105,7 +106,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             width: 32,
             height: 32,
             borderRadius: 8,
-            background: "linear-gradient(135deg, var(--accent), #6366f1)",
+            background: "linear-gradient(135deg, #8b5cf6, #6366f1)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -192,8 +193,8 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 justifyContent: collapsed ? "center" : "flex-start",
                 borderRadius: "var(--radius-sm)",
                 border: "none",
-                background: isActive ? "var(--accent-dim)" : "transparent",
-                color: isActive ? "var(--accent)" : "var(--text-muted)",
+                background: isActive ? "rgba(255,255,255,0.93)" : "transparent",
+                color: isActive ? "#0f0f0f" : "var(--text-muted)",
                 fontWeight: isActive ? 600 : 400,
                 fontSize: 13,
                 cursor: "pointer",
@@ -202,19 +203,19 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 textAlign: "left",
               }}
               onMouseEnter={(e) => {
-                if (!isActive)
+                if (!isActive) {
                   (e.currentTarget as HTMLElement).style.background =
-                    "var(--bg-hover)";
-                if (!isActive)
+                    "rgba(255,255,255,0.07)";
                   (e.currentTarget as HTMLElement).style.color = "var(--text)";
+                }
               }}
               onMouseLeave={(e) => {
-                if (!isActive)
+                if (!isActive) {
                   (e.currentTarget as HTMLElement).style.background =
                     "transparent";
-                if (!isActive)
                   (e.currentTarget as HTMLElement).style.color =
                     "var(--text-muted)";
+                }
               }}
             >
               {item.icon}

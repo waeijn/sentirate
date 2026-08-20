@@ -57,14 +57,15 @@ const ICONS = {
   ),
 };
 
+// ── Figma-matching icon colors ─────────────────────────────────────────────
 const ICON_COLORS = {
-  throughput: "#3b82f6",
+  throughput: "#6366f1",
   latency: "#8b5cf6",
-  threats: "#ef4444",
-  acceptance: "#22c55e",
+  threats: "#f87171",
+  acceptance: "#4ade80",
 };
 
-// ─── Classification Accuracy Modal ───────────────────────────────────────────
+// ─── Classification Accuracy Modal ────────────────────────────────────────
 
 interface AccuracyModalProps {
   onClose: () => void;
@@ -119,7 +120,7 @@ function ClassificationAccuracyModal({
         position: "fixed",
         inset: 0,
         zIndex: 200,
-        background: "rgba(0,0,0,0.55)",
+        background: "rgba(0,0,0,0.65)",
         backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
@@ -130,16 +131,15 @@ function ClassificationAccuracyModal({
         onClick={(e) => e.stopPropagation()}
         className="fade-in"
         style={{
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border)",
+          background: "#1c1c24",
+          border: "1px solid #2e2e3e",
           borderRadius: 14,
           padding: 28,
           width: 440,
           maxWidth: "92vw",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.8)",
         }}
       >
-        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -199,7 +199,7 @@ function ClassificationAccuracyModal({
         {/* FPR */}
         <div
           style={{
-            background: "var(--bg-panel)",
+            background: "#252530",
             borderRadius: 10,
             padding: "16px 18px",
             marginBottom: 12,
@@ -250,16 +250,14 @@ function ClassificationAccuracyModal({
             }}
           >
             Out of all legitimate traffic, {fpr.toFixed(1)}% was incorrectly
-            flagged as suspicious. These requests were briefly throttled before
-            the adaptive engine reclassified them. Low FPR means less disruption
-            for real users.
+            flagged as suspicious.
           </p>
         </div>
 
         {/* FNR */}
         <div
           style={{
-            background: "var(--bg-panel)",
+            background: "#252530",
             borderRadius: 10,
             padding: "16px 18px",
             marginBottom: 16,
@@ -310,13 +308,11 @@ function ClassificationAccuracyModal({
             }}
           >
             Out of all malicious traffic, {fnr.toFixed(1)}% slipped through
-            without being detected. These were primarily low-and-slow attacks
-            that stayed just below the detection threshold. The adaptive engine
-            continuously works to reduce this rate.
+            without being detected.
           </p>
         </div>
 
-        {/* TPR / TNR / Accuracy summary row */}
+        {/* Summary row */}
         <div
           style={{
             display: "grid",
@@ -344,8 +340,8 @@ function ClassificationAccuracyModal({
             <div
               key={item.label}
               style={{
-                background: "var(--bg-panel)",
-                border: "1px solid var(--border)",
+                background: "#252530",
+                border: "1px solid #2e2e3e",
                 borderRadius: 8,
                 padding: "12px 14px",
                 textAlign: "center",
@@ -382,7 +378,7 @@ function ClassificationAccuracyModal({
   );
 }
 
-// ─── StatCard ─────────────────────────────────────────────────────────────────
+// ─── StatCard ─────────────────────────────────────────────────────────────
 
 export function StatCard({
   data,
@@ -425,15 +421,15 @@ export function StatCard({
           (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
         }}
       >
-        {/* Subtle top accent line */}
+        {/* Subtle top accent — very low opacity so it doesn't tint the card */}
         <div
           style={{
             position: "absolute",
             top: 0,
             left: 0,
             right: 0,
-            height: 2,
-            background: `linear-gradient(90deg, ${iconColor}44, transparent)`,
+            height: 1,
+            background: `${iconColor}66`,
           }}
         />
 
@@ -458,8 +454,8 @@ export function StatCard({
               width: 34,
               height: 34,
               borderRadius: 8,
-              background: `${iconColor}18`,
-              border: `1px solid ${iconColor}33`,
+              background: `${iconColor}14`,
+              border: `1px solid ${iconColor}28`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

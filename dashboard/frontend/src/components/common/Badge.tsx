@@ -1,45 +1,49 @@
 import type { Classification, Action, AlertSeverity } from "../../types";
 
-const CLASS_STYLES: Record<
-  Classification,
-  { bg: string; color: string; border: string }
-> = {
+// ── Figma prototype badge styles ───────────────────────────────────────────
+// Pill shape, no visible border, solid dim background, colored text
+// Border radius is full pill (999px) not var(--radius-sm)
+
+const CLASS_STYLES: Record<Classification, { bg: string; color: string }> = {
   normal: {
     bg: "var(--normal-dim)",
     color: "var(--normal)",
-    border: "var(--normal)",
   },
   bursty: {
     bg: "var(--bursty-dim)",
     color: "var(--bursty)",
-    border: "var(--bursty)",
   },
   suspicious: {
     bg: "var(--suspicious-dim)",
     color: "var(--suspicious)",
-    border: "var(--suspicious)",
   },
 };
 
-const ACTION_STYLES: Record<
-  Action,
-  { bg: string; color: string; border: string }
-> = {
+const ACTION_STYLES: Record<Action, { bg: string; color: string }> = {
   allowed: {
     bg: "var(--normal-dim)",
     color: "var(--normal)",
-    border: "var(--normal)",
   },
   throttled: {
     bg: "var(--bursty-dim)",
     color: "var(--bursty)",
-    border: "var(--bursty)",
   },
   blocked: {
     bg: "var(--suspicious-dim)",
     color: "var(--suspicious)",
-    border: "var(--suspicious)",
   },
+};
+
+const CLASS_LABELS: Record<Classification, string> = {
+  normal: "Normal",
+  bursty: "Bursty",
+  suspicious: "Suspicious",
+};
+
+const ACTION_LABELS: Record<Action, string> = {
+  allowed: "Allowed",
+  throttled: "Throttled",
+  blocked: "Blocked",
 };
 
 export function ClassBadge({ type }: { type: Classification }) {
@@ -49,19 +53,17 @@ export function ClassBadge({ type }: { type: Classification }) {
       style={{
         background: s.bg,
         color: s.color,
-        border: `1px solid ${s.border}44`,
-        borderRadius: "var(--radius-sm)",
-        padding: "2px 10px",
-        fontSize: 12,
+        borderRadius: 999,
+        padding: "3px 12px",
+        fontSize: 11,
         fontWeight: 600,
         fontFamily: "var(--font-display)",
-        textTransform: "capitalize",
+        letterSpacing: "0.02em",
         whiteSpace: "nowrap",
+        display: "inline-block",
       }}
     >
-      {type === "suspicious"
-        ? "Suspicious"
-        : type.charAt(0).toUpperCase() + type.slice(1)}
+      {CLASS_LABELS[type]}
     </span>
   );
 }
@@ -73,17 +75,17 @@ export function ActionBadge({ type }: { type: Action }) {
       style={{
         background: s.bg,
         color: s.color,
-        border: `1px solid ${s.border}44`,
-        borderRadius: "var(--radius-sm)",
-        padding: "2px 10px",
-        fontSize: 12,
+        borderRadius: 999,
+        padding: "3px 12px",
+        fontSize: 11,
         fontWeight: 600,
         fontFamily: "var(--font-display)",
-        textTransform: "capitalize",
+        letterSpacing: "0.02em",
         whiteSpace: "nowrap",
+        display: "inline-block",
       }}
     >
-      {type.charAt(0).toUpperCase() + type.slice(1)}
+      {ACTION_LABELS[type]}
     </span>
   );
 }

@@ -1,15 +1,33 @@
 import type { Alert, AlertSeverity } from "../../types";
 
+// ── Figma-matching alert styles ────────────────────────────────────────────
+// Dark solid backgrounds, not glowing — keeps the overall dark theme clean
 const SEVERITY_STYLES: Record<
   AlertSeverity,
-  { color: string; bg: string; icon: string }
+  { color: string; bg: string; border: string; icon: string }
 > = {
-  info: { color: "var(--accent)", bg: "var(--accent-dim)", icon: "ℹ" },
-  success: { color: "var(--normal)", bg: "var(--normal-glow)", icon: "✓" },
-  warning: { color: "var(--bursty)", bg: "var(--bursty-glow)", icon: "⚠" },
+  info: {
+    color: "var(--accent)",
+    bg: "var(--accent-dim)",
+    border: "var(--accent-dim)",
+    icon: "i",
+  },
+  success: {
+    color: "var(--normal)",
+    bg: "var(--normal-dim)",
+    border: "var(--normal-glow)",
+    icon: "✓",
+  },
+  warning: {
+    color: "var(--bursty)",
+    bg: "var(--bursty-dim)",
+    border: "var(--bursty-glow)",
+    icon: "⚠",
+  },
   error: {
     color: "var(--suspicious)",
-    bg: "var(--suspicious-glow)",
+    bg: "var(--suspicious-dim)",
+    border: "var(--suspicious-glow)",
     icon: "✕",
   },
 };
@@ -80,8 +98,7 @@ export function RecentAlerts({ alerts }: RecentAlertsProps) {
               className="fade-in"
               style={{
                 background: s.bg,
-                border: `1px solid ${s.color}22`,
-                borderLeft: `3px solid ${s.color}`,
+                border: `1px solid ${s.border}`,
                 borderRadius: "var(--radius-sm)",
                 padding: "10px 12px",
                 display: "flex",
@@ -96,6 +113,8 @@ export function RecentAlerts({ alerts }: RecentAlertsProps) {
                   color: s.color,
                   flexShrink: 0,
                   marginTop: 1,
+                  width: 14,
+                  textAlign: "center",
                 }}
               >
                 {s.icon}

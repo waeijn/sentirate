@@ -31,12 +31,23 @@ export interface LogEntry {
   id: string;
   timestamp: string;
   clientIp: string;
-  burstFreq: number;
-  jitter: number;
-  intervalReg: number;
-  persistence: number;
+  // Raw values from backend — NOT normalized to 0-1
+  requestRate: number; // λ in req/s  (e.g. 12.4)
+  sigma: number | null; // σ in seconds (e.g. 0.03), null if insufficient history
+  burstFreq: number; // bursts per minute (e.g. 3)
+  persistence: number; // seconds of sustained elevated rate (e.g. 8.2)
+  // Token bucket state
+  bucketFill: number; // 0-100 percentage
+  refillRate: number; // tokens/sec
+  bucketCapacity: number; // max tokens
+  tokensRemaining: number;
+  retryAfter: number;
+  // Decision
   classification: Classification;
   action: Action;
+  // Explainability
+  justification: string;
+  matchedRules: string[];
 }
 
 export interface ClassificationProfile {
@@ -52,6 +63,11 @@ export interface SystemSummary {
   total_accepted: number;
   total_rejected: number;
   classifications: { normal: number; bursty: number; suspicious: number };
+  rar_percent: number;
+  fpr_percent: number;
+  fnr_percent: number;
+  avg_latency_ms: number;
+  p95_latency_ms: number;
   top_clients: TopClient[];
 }
 

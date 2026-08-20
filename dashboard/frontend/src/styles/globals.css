@@ -1,37 +1,77 @@
 @import url("https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap");
 
+/* ── Dark mode (default) — matches Figma prototype ───────────────────────── */
 :root {
-  --bg: #080d14;
-  --bg-elevated: #0d1420;
-  --bg-panel: #101a28;
-  --bg-hover: #162033;
-  --border: #1c2d42;
-  --border-light: #243448;
+  --bg: #09090b;
+  --bg-elevated: #0f0f0f;
+  --bg-panel: #0f0f0f;
+  --bg-hover: #161616;
+  --border: #1e1e1e;
+  --border-light: #262626;
 
-  --normal: #22c55e;
-  --normal-dim: #16a34a33;
-  --normal-glow: #22c55e22;
-  --bursty: #f59e0b;
-  --bursty-dim: #d9770633;
-  --bursty-glow: #f59e0b22;
-  --suspicious: #ef4444;
-  --suspicious-dim: #dc262633;
-  --suspicious-glow: #ef444422;
+  --normal: #4ade80;
+  --normal-dim: #4ade800e;
+  --normal-glow: #4ade8018;
+  --bursty: #fbbf24;
+  --bursty-dim: #fbbf240e;
+  --bursty-glow: #fbbf2418;
+  --suspicious: #f87171;
+  --suspicious-dim: #f871710e;
+  --suspicious-glow: #f8717118;
 
-  --accent: #3b82f6;
-  --accent-dim: #3b82f622;
-  --text: #e2e8f0;
-  --text-muted: #4a6080;
-  --text-dim: #8099b4;
+  --accent: #8b5cf6;
+  --accent-2: #6366f1;
+  --accent-dim: #8b5cf614;
+  --accent-grad: linear-gradient(135deg, #6366f1, #8b5cf6);
+
+  --text: #e4e8f5;
+  --text-muted: #4a4a5a;
+  --text-dim: #7a7a8a;
 
   --font-display: "Sora", sans-serif;
   --font-mono: "DM Mono", monospace;
 
-  --radius: 10px;
-  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-sm: 7px;
   --sidebar-w: 220px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
 }
 
+/* ── Light mode ───────────────────────────────────────────────────────────── */
+:root.light {
+  --bg: #f8f8f8;
+  --bg-elevated: #ffffff;
+  --bg-panel: #ffffff;
+  --bg-hover: #f0f0f0;
+  --border: #e2e2e2;
+  --border-light: #d0d0d0;
+
+  --normal: #16a34a;
+  --normal-dim: #16a34a14;
+  --normal-glow: #16a34a20;
+  --bursty: #d97706;
+  --bursty-dim: #d9770614;
+  --bursty-glow: #d9770620;
+  --suspicious: #dc2626;
+  --suspicious-dim: #dc262614;
+  --suspicious-glow: #dc262620;
+
+  --accent: #7c3aed;
+  --accent-2: #4f46e5;
+  --accent-dim: #7c3aed14;
+  --accent-grad: linear-gradient(135deg, #4f46e5, #7c3aed);
+
+  --text: #111111;
+  --text-muted: #888888;
+  --text-dim: #555555;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Reset ────────────────────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -50,8 +90,12 @@ body,
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  transition:
+    background 0.25s ease,
+    color 0.25s ease;
 }
 
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -67,16 +111,12 @@ body,
   background: var(--border-light);
 }
 
-/* Subtle grid background */
+/* ── Grid background — disabled to match Figma (no grid) ─────────────────── */
 .grid-bg {
-  background-image:
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 32px 32px;
-  background-position: -1px -1px;
+  background-image: none;
 }
 
-/* Glow pulse animation */
+/* ── Animations ───────────────────────────────────────────────────────────── */
 @keyframes pulse-dot {
   0%,
   100% {
@@ -108,6 +148,15 @@ body,
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes spin-once {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(180deg);
   }
 }
 

@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences
+POST,/api/request [bursty],HTTPError('429 Client Error: Too Many Requests for url: /api/request [bursty]'),110

@@ -120,22 +120,35 @@ function makeLogEntry(
   ip: string,
   classification: Classification,
   action: Action,
-  burstFreq: number,
-  jitter: number,
-  intervalReg: number,
-  persistence: number,
+  requestRate: number, // req/s
+  sigma: number | null, // seconds
+  burstFreq: number, // bursts/min
+  persistence: number, // seconds
   dateStr: string,
 ): LogEntry {
+  const profiles = {
+    normal: { refillRate: 10, bucketCapacity: 20 },
+    bursty: { refillRate: 20, bucketCapacity: 40 },
+    suspicious: { refillRate: 2, bucketCapacity: 5 },
+  };
+  const p = profiles[classification];
   return {
     id: Math.random().toString(36).slice(2),
     timestamp: dateStr,
     clientIp: ip,
+    requestRate,
+    sigma,
     burstFreq,
-    jitter,
-    intervalReg,
     persistence,
+    bucketFill: 80,
+    refillRate: p.refillRate,
+    bucketCapacity: p.bucketCapacity,
+    tokensRemaining: p.bucketCapacity * 0.8,
+    retryAfter: 0,
     classification,
     action,
+    justification: "",
+    matchedRules: [],
   };
 }
 
@@ -144,120 +157,120 @@ const SEED_LOGS: LogEntry[] = [
     "192.168.1.47",
     "suspicious",
     "throttled",
-    0.12,
+    45.2,
     0.03,
-    0.94,
-    0.88,
+    6,
+    18.5,
     "2026-02-19 14:32:08",
   ),
   makeLogEntry(
     "10.0.3.12",
     "bursty",
     "allowed",
-    0.78,
-    0.45,
-    0.22,
-    0.15,
+    14.8,
+    0.21,
+    3,
+    7.2,
     "2026-02-19 14:31:55",
   ),
   makeLogEntry(
     "203.0.113.15",
     "suspicious",
     "blocked",
-    0.95,
-    0.01,
-    0.98,
-    0.97,
+    98.1,
+    0.0,
+    8,
+    22.0,
     "2026-02-19 14:31:22",
   ),
   makeLogEntry(
     "198.51.100.22",
     "suspicious",
     "throttled",
-    0.65,
-    0.08,
-    0.82,
-    0.71,
+    35.6,
+    0.02,
+    5,
+    16.1,
     "2026-02-19 14:30:47",
   ),
   makeLogEntry(
     "10.0.1.88",
     "normal",
     "allowed",
-    0.15,
-    0.52,
-    0.18,
-    0.1,
+    2.3,
+    0.84,
+    0,
+    0.0,
     "2026-02-19 14:30:12",
   ),
   makeLogEntry(
     "172.16.0.55",
     "normal",
     "allowed",
-    0.08,
-    0.61,
-    0.12,
-    0.05,
+    1.8,
+    1.12,
+    0,
+    0.0,
     "2026-02-19 14:29:44",
   ),
   makeLogEntry(
     "10.0.2.33",
     "bursty",
     "allowed",
-    0.72,
-    0.38,
-    0.25,
+    18.4,
     0.18,
+    4,
+    10.3,
     "2026-02-19 14:29:18",
   ),
   makeLogEntry(
     "192.168.2.100",
     "suspicious",
     "blocked",
-    0.88,
-    0.02,
-    0.91,
-    0.93,
+    67.3,
+    0.01,
+    7,
+    19.8,
     "2026-02-19 14:28:55",
   ),
   makeLogEntry(
     "10.0.4.77",
     "normal",
     "allowed",
-    0.31,
-    0.44,
-    0.29,
-    0.12,
+    3.1,
+    0.72,
+    1,
+    2.1,
     "2026-02-19 14:28:22",
   ),
   makeLogEntry(
     "172.16.1.15",
     "bursty",
     "allowed",
-    0.82,
-    0.41,
-    0.19,
-    0.2,
+    22.7,
+    0.14,
+    4,
+    12.6,
     "2026-02-19 14:27:50",
   ),
   makeLogEntry(
     "198.51.100.44",
     "suspicious",
     "throttled",
-    0.55,
-    0.06,
-    0.87,
-    0.76,
+    41.5,
+    0.02,
+    6,
+    17.3,
     "2026-02-19 14:27:15",
   ),
   makeLogEntry(
     "10.0.1.22",
     "normal",
     "allowed",
-    0.19,
-    0.55,
-    0.15,
-    0.08,
+    1.5,
+    0.95,
+    0,
+    0.0,
     "2026-02-19 14:26:48",
   ),
 ];
@@ -266,6 +279,9 @@ const SEED_LOGS: LogEntry[] = [
 
 export default function App() {
   const socketRef = useRef<Socket | null>(null);
+  const reqCountRef = useRef<number>(0);
+  const prevTotalRef = useRef<number>(0);
+  const prevTimeRef = useRef<number>(Date.now());
   const [page, setPage] = useState<Page>("monitoring");
   const [connected, setConnected] = useState(false);
 
@@ -277,6 +293,19 @@ export default function App() {
 
   // Logs state
   const [logs, setLogs] = useState<LogEntry[]>(SEED_LOGS);
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    const saved = localStorage.getItem("theme");
+    return saved ? saved === "dark" : true;
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("light", !isDark);
+    localStorage.setItem("theme", isDark ? "dark" : "light");
+  }, [isDark]);
+
+  const toggleTheme = () => setIsDark((d) => !d);
 
   // ─── Socket connection ───────────────────────────────────────────────────
 
@@ -295,26 +324,48 @@ export default function App() {
         recent_events: LiveEvent[];
       }) => {
         const s = data.summary;
+        const now = Date.now();
+        const currentTotal = s.total_accepted + s.total_rejected;
+        const elapsed = (now - prevTimeRef.current) / 1000;
+        const rps =
+          elapsed > 0
+            ? Math.round((currentTotal - prevTotalRef.current) / elapsed)
+            : 0;
+        prevTotalRef.current = currentTotal;
+        prevTimeRef.current = now;
+        reqCountRef.current += data.recent_events?.length ?? 0;
 
         // ── Stat cards ──────────────────────────────────────────────────────
         const total = s.total_accepted + s.total_rejected;
+        // Use backend-computed RAR directly — it's calculated from the
+        // full request log in FeedbackProvider.get_summary_metrics()
         const acceptRate =
-          total > 0 ? ((s.total_accepted / total) * 100).toFixed(1) : "100.0";
+          s.rar_percent != null
+            ? s.rar_percent.toFixed(1)
+            : total > 0
+              ? ((s.total_accepted / total) * 100).toFixed(1)
+              : "100.0";
 
         setStats([
           {
             label: "System Throughput",
-            value: s.active_clients.toString(),
-            unit: "clients",
-            delta: `+${s.classifications.normal} normal`,
+            value: rps.toLocaleString(),
+            unit: "req/s",
+            delta: `${s.active_clients} clients`,
             deltaPositive: true,
             icon: "throughput",
           },
           {
             label: "Request Latency",
-            value: "< 5",
+            value:
+              s.avg_latency_ms != null && s.avg_latency_ms > 0
+                ? s.avg_latency_ms.toFixed(2)
+                : "< 1",
             unit: "ms",
-            delta: "Within latency target",
+            delta:
+              s.p95_latency_ms != null && s.p95_latency_ms > 0
+                ? `p95: ${s.p95_latency_ms.toFixed(2)}ms`
+                : "Within latency target",
             deltaPositive: true,
             icon: "latency",
           },
@@ -337,35 +388,27 @@ export default function App() {
           },
         ]);
 
-        // ── Analytics — compute FPR/FNR from live classification data ───────
-        // Legitimate = normal + bursty clients
-        // FPR: suspicious clients out of all clients (proxy for false positives)
-        // FNR: estimated from rejected-but-legitimate (clients throttled despite low rate)
-        const legitClients =
-          s.classifications.normal + s.classifications.bursty;
-        const suspiciousCount = s.classifications.suspicious;
-        const allClients = legitClients + suspiciousCount;
-
-        if (allClients > 0 && total > 0) {
-          const fpr = parseFloat(
-            ((suspiciousCount / Math.max(1, allClients)) * 100).toFixed(1),
-          );
-          const fnr = parseFloat(
-            ((s.total_rejected / Math.max(1, total)) * 5).toFixed(1),
-          ); // scaled estimate
-          const tpr = parseFloat((100 - fnr).toFixed(1));
-          const tnr = parseFloat((100 - fpr).toFixed(1));
-          const accuracy = parseFloat(((tpr + tnr) / 2).toFixed(1));
-
-          setAnalytics({ fpr, fnr, tpr, tnr, accuracy });
-        }
+        // ── Analytics — use backend computed values directly ─────────────────
+        // Backend FeedbackProvider.get_summary_metrics() computes these
+        // correctly from the full request log, not from client counts.
+        setAnalytics({
+          fpr: s.fpr_percent ?? 0.0,
+          fnr: s.fnr_percent ?? 0.0,
+          tpr: parseFloat((100 - (s.fnr_percent ?? 0)).toFixed(1)),
+          tnr: parseFloat((100 - (s.fpr_percent ?? 0)).toFixed(1)),
+          accuracy: parseFloat(
+            ((200 - (s.fpr_percent ?? 0) - (s.fnr_percent ?? 0)) / 2).toFixed(
+              1,
+            ),
+          ),
+        });
 
         // ── Chart ────────────────────────────────────────────────────────────
         setChartData((prev) =>
           [
             ...prev,
             {
-              time: new Date(data.timestamp).toLocaleTimeString(),
+              time: new Date(parseInt(data.timestamp)).toLocaleTimeString(),
               normal: s.classifications.normal,
               bursty: s.classifications.bursty,
               suspicious: s.classifications.suspicious,
@@ -379,39 +422,81 @@ export default function App() {
             id: Math.random().toString(36).slice(2),
             timestamp: new Date().toLocaleString(),
             clientIp: e.client_id,
-            burstFreq: Math.min(1, e.burst_count / 10),
-            jitter:
-              e.interval_jitter != null ? Math.min(1, e.interval_jitter) : 0.5,
-            intervalReg:
-              e.interval_jitter != null
-                ? Math.max(0, 1 - e.interval_jitter)
-                : 0.5,
-            persistence: Math.min(1, e.burst_count / 5),
+            // Raw values — no normalization
+            requestRate: parseFloat((e.request_rate_min / 60).toFixed(2)), // convert req/min → req/s
+            sigma: e.interval_jitter, // already in seconds
+            burstFreq: e.burst_count, // bursts/min integer
+            persistence: e.burst_persistence, // seconds
+            bucketFill: e.bucket_fill,
+            refillRate: e.refill_rate,
+            bucketCapacity: e.bucket_capacity,
+            tokensRemaining: e.tokens_remaining,
+            retryAfter: e.retry_after,
             classification: e.classification,
             action: !e.allowed
               ? "blocked"
               : e.classification === "suspicious"
                 ? "throttled"
                 : "allowed",
+            justification: e.justification,
+            matchedRules: e.matched_rules ?? [],
           }));
 
-          setLogs((prev) => [...newEntries, ...prev].slice(0, 200));
+          setLogs((prev) => {
+            // Keep a fair mix — cap each classification at 100 entries
+            // so Suspicious flooding doesn't erase Normal/Bursty from the log
+            const combined = [...newEntries, ...prev];
+            const normal = combined
+              .filter((e) => e.classification === "normal")
+              .slice(0, 100);
+            const bursty = combined
+              .filter((e) => e.classification === "bursty")
+              .slice(0, 100);
+            const suspicious = combined
+              .filter((e) => e.classification === "suspicious")
+              .slice(0, 100);
+            // Interleave so the table shows a realistic mix
+            return [...normal, ...bursty, ...suspicious]
+              .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+              .slice(0, 300);
+          });
 
-          const blocked = data.recent_events.filter(
-            (e) => !e.allowed && e.classification === "suspicious",
-          );
-          if (blocked.length > 0) {
-            const ev = blocked[0];
-            setAlerts((prev) =>
-              [
-                makeAlert(
+          const newAlerts = data.recent_events
+            .filter(
+              (e, i, arr) =>
+                // deduplicate — one alert per unique client per update cycle
+                arr.findIndex((x) => x.client_id === e.client_id) === i,
+            )
+            .map((e) => {
+              const rate = e.request_rate_min.toFixed(0);
+              const sigma =
+                e.interval_jitter != null
+                  ? e.interval_jitter.toFixed(2)
+                  : "N/A";
+
+              if (!e.allowed || e.classification === "suspicious") {
+                return makeAlert(
                   "error",
-                  `${ev.client_id} blocked — rate ${ev.request_rate_min.toFixed(0)} req/min, σ=${ev.interval_jitter?.toFixed(2) ?? "N/A"}s`,
+                  `${e.client_id} blocked — rate ${rate} req/min, σ=${sigma}s`,
                   new Date().toLocaleTimeString(),
-                ),
-                ...prev,
-              ].slice(0, 20),
-            );
+                );
+              } else if (e.classification === "bursty") {
+                return makeAlert(
+                  "warning",
+                  `${e.client_id} bursty — rate ${rate} req/min, bucket expanded`,
+                  new Date().toLocaleTimeString(),
+                );
+              } else {
+                return makeAlert(
+                  "success",
+                  `${e.client_id} normal — rate ${rate} req/min, allowed`,
+                  new Date().toLocaleTimeString(),
+                );
+              }
+            });
+
+          if (newAlerts.length > 0) {
+            setAlerts((prev) => [...newAlerts, ...prev].slice(0, 30));
           }
         }
       },
@@ -440,9 +525,14 @@ export default function App() {
           overflow: "hidden",
         }}
       >
-        <TopBar title={PAGE_TITLES[page]} connected={connected} />
+        <TopBar
+          title={PAGE_TITLES[page]}
+          connected={connected}
+          isDark={isDark}
+          onToggleTheme={toggleTheme}
+        />
 
-        <main style={{ flex: 1, overflowY: "auto" }} className="grid-bg">
+        <main style={{ flex: 1, overflowY: "auto" }}>
           {page === "monitoring" && (
             <Monitoring
               stats={stats}

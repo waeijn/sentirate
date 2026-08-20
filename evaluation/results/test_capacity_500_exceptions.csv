@@ -1,0 +1,11 @@
+Count,Message,Traceback,Nodes
+1640,batch_wait() takes 0 positional arguments but 1 was given,"  File ""C:\Users\Terrence John\AppData\Local\Programs\Python\Python313\Lib\site-packages\locust\user\task.py"", line 368, in run
+    self.wait()
+    ~~~~~~~~~^^
+  File ""C:\Users\Terrence John\AppData\Local\Programs\Python\Python313\Lib\site-packages\locust\user\task.py"", line 464, in wait
+    self._sleep(self.wait_time())
+                ~~~~~~~~~~~~~~^^
+  File ""C:\Users\Terrence John\AppData\Local\Programs\Python\Python313\Lib\site-packages\locust\user\task.py"", line 443, in wait_time
+    return self.user.wait_time()
+           ~~~~~~~~~~~~~~~~~~~^^
+",local

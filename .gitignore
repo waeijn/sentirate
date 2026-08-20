@@ -214,3 +214,6 @@ dist/
 # Frontend build
 dashboard/frontend/dist/
 dashboard/frontend/.vite/
+# Ad-hoc debug/demo output
+demo_log_output.json
+sigma_demo.json

@@ -1,138 +1,214 @@
 """
-WebSocket handler + traffic simulator
-Aligned to SRS FR-1.5.2 (dashboard), FR-1.2.2/3/4 (traffic patterns)
+websocket_handler.py
+=====================
+Socket.IO real-time event handler for the dashboard.
+
+Emits 'metrics_update' every 2 seconds with a payload that matches
+the exact shape App.tsx expects:
+
+  socket.on("metrics_update", (data: {
+    timestamp: string,
+    summary: SystemSummary,
+    recent_events: LiveEvent[]
+  }) => { ... })
+
+Field names here must match types/index.ts exactly.
 """
+
 import asyncio
-import random
+import logging
 import time
-from datetime import datetime
-from heuristic_engine import RateLimiterEngine
+import random
+from middleware import AdaptiveRateLimiter
+from heuristic_engine import TrafficType
 
-engine    = RateLimiterEngine()
-sim_state = {"running": False, "scenario": "mixed", "task": None}
-
-
-def make_id(prefix: str, n: int) -> str:
-    return f"{prefix}_{n:03d}"
+logger = logging.getLogger("websocket")
 
 
-async def simulate_traffic(sio, scenario: str, users: int):
+# =============================================================================
+# Simulation profiles
+# =============================================================================
+
+SIMULATION_PROFILES = {
+    "normal": {
+        "ips":           [f"192.168.1.{i}" for i in range(10, 15)],
+        "req_per_cycle": (1, 3),
+        "interval":      (0.15, 0.5),
+    },
+    "bursty": {
+        "ips":           [f"10.0.3.{i}" for i in range(20, 25)],
+        "req_per_cycle": (5, 12),
+        "interval":      (0.05, 0.12),
+    },
+    "suspicious": {
+        "ips":           [f"203.0.113.{i}" for i in range(30, 35)],
+        "req_per_cycle": (15, 25),
+        "interval":      (0.025, 0.032),
+    },
+}
+
+
+def register_socketio_events(sio, limiter: AdaptiveRateLimiter):
     """
-    Simulate per SRS FR-1.2.2/3/4 behavioral profiles:
-
-    normal     → 5-50 req/min, σ > 0.5s jitter, ≤2 bursts/5min
-    bursty     → 50-200 req/min, σ > 0.3s jitter, 3-10 bursts
-    suspicious → >200 req/min sustained, σ < 0.1s (robotic)
+    Registers all Socket.IO event handlers.
+    Called once from main.py with the shared limiter instance.
     """
-    pools = {
-        "normal":     [make_id("normal",     i) for i in range(max(1, users))],
-        "bursty":     [make_id("bursty",     i) for i in range(max(1, users // 3))],
-        "suspicious": [make_id("suspicious", i) for i in range(max(1, users // 5))],
-    }
 
-    active = (
-        {"normal":     pools["normal"]}     if scenario == "normal"     else
-        {"bursty":     pools["bursty"]}     if scenario == "bursty"     else
-        {"suspicious": pools["suspicious"]} if scenario == "suspicious" else
-        pools
-    )
+    simulation_running = {"active": False}
+    broadcast_started  = {"done": False}
 
-    while sim_state["running"]:
-        events     = []
-        tick_start = time.time()
-
-        for pool_type, pool in active.items():
-            client_id = random.choice(pool)
-
-            if pool_type == "normal":
-                # FR-1.2.2: 5-50 req/min → ~0.1-0.8 req/s
-                # σ > 0.5s — very irregular human timing
-                count = random.randint(1, 4)
-                for _ in range(count):
-                    is_error = random.random() < 0.05  # <10% error rate
-                    result   = engine.process_request(client_id, is_error=is_error)
-                    events.append(result)
-                    await asyncio.sleep(random.uniform(0.3, 1.5))  # high jitter
-
-            elif pool_type == "bursty":
-                # FR-1.2.3: 50-200 req/min, σ > 0.3s, burst 3-10 times
-                count = random.randint(5, 15)
-                for _ in range(count):
-                    is_error = random.random() < 0.10  # <15% error rate
-                    result   = engine.process_request(client_id, is_error=is_error)
-                    events.append(result)
-                    await asyncio.sleep(random.uniform(0.03, 0.12))  # moderate jitter
-
-            elif pool_type == "suspicious":
-                # FR-1.2.4: >200 req/min, σ < 0.1s (robotic), sustained
-                count = random.randint(20, 40)
-                for _ in range(count):
-                    is_error = random.random() < 0.50  # high error rate
-                    result   = engine.process_request(client_id, is_error=is_error)
-                    events.append(result)
-                    await asyncio.sleep(0.008)  # 8ms fixed = very regular = bot
-
-        # SRS FR-1.5.2: emit every ~5 seconds (paced by tick)
-        summary = engine.get_summary()
-        await sio.emit("metrics_update", {
-            "timestamp":     datetime.now().isoformat(),
-            "summary":       summary,
-            "recent_events": events[-30:],
-        })
-
-        elapsed = time.time() - tick_start
-        if elapsed < 1.0:
-            await asyncio.sleep(1.0 - elapsed)
-
-
-def register_socketio_events(sio):
+    # ── Connection lifecycle ──────────────────────────────────────────────────
 
     @sio.event
     async def connect(sid, environ):
-        print(f"[WS] Connected: {sid}")
-        await sio.emit("connection_status", {
-            "status":  "connected",
-            "message": "Connected to Adaptive Rate Limiter Dashboard"
-        }, to=sid)
+        print(f"[WebSocket] Client connected: {sid}")
+        # Start broadcast loop on first connection
+        if not broadcast_started["done"]:
+            broadcast_started["done"] = True
+            asyncio.create_task(broadcast_metrics())
+        # Immediate snapshot so dashboard populates instantly
+        snapshot = await _build_metrics_payload(limiter)   
+        await sio.emit("metrics_update", snapshot, to=sid)
 
     @sio.event
     async def disconnect(sid):
-        print(f"[WS] Disconnected: {sid}")
+        print(f"[WebSocket] Client disconnected: {sid}")
 
-    @sio.event
-    async def start_simulation(sid, data):
-        scenario = data.get("scenario", "mixed")
-        users    = int(data.get("users", 10))
-
-        if sim_state["running"]:
-            await sio.emit("simulation_status", {"status": "already_running"}, to=sid)
-            return
-
-        engine.clients.clear()
-        sim_state["running"]  = True
-        sim_state["scenario"] = scenario
-        sim_state["task"]     = asyncio.create_task(
-            simulate_traffic(sio, scenario, users)
-        )
-        await sio.emit("simulation_status", {
-            "status": "started", "scenario": scenario, "users": users,
-        })
-        print(f"[SIM] Started — scenario={scenario}, users={users}")
-
-    @sio.event
-    async def stop_simulation(sid, data=None):
-        if sim_state["task"]:
-            sim_state["task"].cancel()
-            sim_state["task"] = None
-        sim_state["running"] = False
-        await sio.emit("simulation_status", {"status": "stopped"})
-        print("[SIM] Stopped")
+    # ── Snapshot on demand ────────────────────────────────────────────────────
 
     @sio.event
     async def get_snapshot(sid, data=None):
-        summary = engine.get_summary()
-        await sio.emit("metrics_update", {
-            "timestamp":     datetime.now().isoformat(),
-            "summary":       summary,
-            "recent_events": [],
-        }, to=sid)
+        snapshot = await _build_metrics_payload(limiter)      
+        await sio.emit("metrics_update", snapshot, to=sid)
+
+    # ── Simulation control ────────────────────────────────────────────────────
+
+    @sio.event
+    async def start_simulation(sid, data=None):
+        if simulation_running["active"]:
+            await sio.emit("simulation_status", {"status": "already_running"}, to=sid)
+            return
+        simulation_running["active"] = True
+        await sio.emit("simulation_status", {"status": "started"}, to=sid)
+        logger.info("[Simulation] Started")
+        asyncio.create_task(
+            _run_simulation(sio, limiter, simulation_running),
+            name="simulation",
+        )
+
+    @sio.event
+    async def stop_simulation(sid, data=None):
+        simulation_running["active"] = False
+        await sio.emit("simulation_status", {"status": "stopped"}, to=sid)
+        logger.info("[Simulation] Stopped")
+
+    # ── Background metrics broadcast ──────────────────────────────────────────
+
+    async def broadcast_metrics():
+        """Push metrics_update to all connected clients every 3 seconds."""
+        while True:
+            await asyncio.sleep(3)
+            try:
+                payload = await _build_metrics_payload(limiter) # ← await added
+                await sio.emit("metrics_update", payload)
+            except Exception:
+                logger.exception("[WebSocket] Broadcast error")
+
+
+# =============================================================================
+# Payload builder — must match App.tsx socket.on shape exactly
+# =============================================================================
+
+async def _build_metrics_payload(limiter: AdaptiveRateLimiter) -> dict:
+    now = time.time()
+
+    metrics, log_entries = await asyncio.gather(
+        limiter.get_metrics(),
+        limiter.get_log(),
+    )
+
+    # ── Classification breakdown ──────────────────────────────────────────
+    cc = metrics.pop("class_counts", {})
+    classifications = {
+        "normal":     cc.get("normal",     0),
+        "bursty":     cc.get("bursty",     0),
+        "suspicious": cc.get("suspicious", 0),
+        "blocked":    cc.get("blocked",    0),
+    }
+
+    active_clients = metrics.get("unique_clients", 0)
+    total_accepted = metrics.get("total_admitted", 0)
+    total_rejected = metrics.get("total_blocked",  0)
+
+    # ── recent_events — shaped exactly for App.tsx LiveEvent interface ────
+    recent_events = []
+    for entry in log_entries[:20]:
+        bucket  = entry.get("bucket", {})
+        markers = entry.get("markers", {})
+        cap     = bucket.get("capacity", 40)
+        tokens  = bucket.get("current_tokens", cap)
+        lam     = markers.get("lambda", 0.0)
+
+        recent_events.append({
+            "client_id":        entry.get("ip", "unknown"),
+            "request_rate_min": round(lam * 60, 2),            
+            "interval_jitter":  markers.get("sigma", None),
+            "burst_count":       round(markers.get("burst_freq",   0.0), 1),
+            "burst_persistence": round(markers.get("persistence",  0.0), 1),
+            "bucket_fill":      round((tokens / cap * 100) if cap > 0 else 0, 1),
+            "refill_rate":      bucket.get("refill_rate", 10.0),
+            "bucket_capacity":  cap,
+            "tokens_remaining": tokens,
+            "retry_after":      bucket.get("seconds_until_token", 0),
+            "allowed":          entry.get("decision", "ADMITTED") == "ADMITTED",
+            "classification":   entry.get("classification", "normal"),
+            "justification":    entry.get("justification", ""),
+        })
+
+    return {
+        "timestamp": str(int(now * 1000)),
+        "summary": {
+            "active_clients":  active_clients,
+            "total_accepted":  total_accepted,
+            "total_rejected":  total_rejected,
+            "total_requests":  metrics.get("total_requests", 0),
+            "rar_percent":     round(metrics.get("rar", 1.0) * 100, 2),
+            "fpr_percent":     round(metrics.get("fpr", 0.0) * 100, 2),
+            "fnr_percent":     round(metrics.get("fnr", 0.0) * 100, 2),
+            "avg_latency_ms":  metrics.get("avg_latency_ms", 0.0),
+            "p95_latency_ms":  metrics.get("p95_latency_ms", 0.0),
+            "classifications": classifications,
+            "throughput":      0.0,
+        },
+        "recent_events": recent_events,
+    }
+
+
+# =============================================================================
+# Simulation background task
+# =============================================================================
+
+async def _run_simulation(sio, limiter: AdaptiveRateLimiter, simulation_running: dict):
+    """
+    Continuously sends simulated traffic through the rate limiter.
+    Each profile uses distinct IP ranges so the classifier sees
+    genuinely different traffic patterns per class.
+    """
+    while simulation_running["active"]:
+        for profile_name, profile in SIMULATION_PROFILES.items():
+            if not simulation_running["active"]:
+                break
+            ip    = random.choice(profile["ips"])
+            n_req = random.randint(*profile["req_per_cycle"])
+            for _ in range(n_req):
+                if not simulation_running["active"]:
+                    break
+                try:
+                    await limiter.process_request(            
+                        ip       = ip,
+                        endpoint = "/api/data",
+                        method   = "GET",
+                    )
+                except Exception:
+                    logger.exception("[Simulation] process_request failed for ip=%s", ip)
+                await asyncio.sleep(random.uniform(*profile["interval"]))

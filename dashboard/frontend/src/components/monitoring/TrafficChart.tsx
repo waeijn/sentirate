@@ -6,13 +6,15 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 import type { TrafficPoint } from "../../types";
 
-interface TrafficChartProps {
-  data: TrafficPoint[];
-}
+// ── Figma-exact colors ────────────────────────────────────────────────────
+const COLORS = {
+  normal: "#4ade80",
+  bursty: "#fbbf24",
+  suspicious: "#f87171",
+};
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -66,7 +68,40 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export function TrafficChart({ data }: TrafficChartProps) {
+// ── Custom legend — top right, matching Figma ─────────────────────────────
+function ChartLegend() {
+  return (
+    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+      {Object.entries(COLORS).map(([key, color]) => (
+        <div
+          key={key}
+          style={{ display: "flex", alignItems: "center", gap: 5 }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: color,
+              display: "inline-block",
+            }}
+          />
+          <span
+            style={{
+              fontSize: 12,
+              color: "var(--text-dim)",
+              textTransform: "capitalize",
+            }}
+          >
+            {key}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function TrafficChart({ data }: { data: TrafficPoint[] }) {
   return (
     <div
       style={{
@@ -76,20 +111,31 @@ export function TrafficChart({ data }: TrafficChartProps) {
         padding: "24px",
       }}
     >
-      <div style={{ marginBottom: 20 }}>
-        <h2
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: "var(--text)",
-            marginBottom: 4,
-          }}
-        >
-          API Traffic Over Time
-        </h2>
-        <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-          Classified by behavioral pattern — refreshes every 5s
-        </p>
+      {/* Header row — title left, legend right (matches Figma) */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <h2
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              color: "var(--text)",
+              marginBottom: 4,
+            }}
+          >
+            API Traffic Over Time
+          </h2>
+          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            Classified by behavioral pattern — refreshes every 5s
+          </p>
+        </div>
+        <ChartLegend />
       </div>
 
       {data.length === 0 ? (
@@ -126,18 +172,27 @@ export function TrafficChart({ data }: TrafficChartProps) {
           >
             <defs>
               <linearGradient id="gradNormal" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                <stop offset="5%" stopColor={COLORS.normal} stopOpacity={0.2} />
+                <stop offset="95%" stopColor={COLORS.normal} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="gradBursty" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                <stop offset="5%" stopColor={COLORS.bursty} stopOpacity={0.2} />
+                <stop offset="95%" stopColor={COLORS.bursty} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="gradSuspicious" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                <stop
+                  offset="5%"
+                  stopColor={COLORS.suspicious}
+                  stopOpacity={0.2}
+                />
+                <stop
+                  offset="95%"
+                  stopColor={COLORS.suspicious}
+                  stopOpacity={0}
+                />
               </linearGradient>
             </defs>
+
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="var(--border)"
@@ -164,23 +219,11 @@ export function TrafficChart({ data }: TrafficChartProps) {
               axisLine={false}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: 12, paddingTop: 16 }}
-              formatter={(value) => (
-                <span
-                  style={{
-                    color: "var(--text-dim)",
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {value}
-                </span>
-              )}
-            />
+
             <Area
               type="monotone"
               dataKey="normal"
-              stroke="#22c55e"
+              stroke={COLORS.normal}
               strokeWidth={2}
               fill="url(#gradNormal)"
               dot={false}
@@ -189,7 +232,7 @@ export function TrafficChart({ data }: TrafficChartProps) {
             <Area
               type="monotone"
               dataKey="bursty"
-              stroke="#f59e0b"
+              stroke={COLORS.bursty}
               strokeWidth={2}
               fill="url(#gradBursty)"
               dot={false}
@@ -198,7 +241,7 @@ export function TrafficChart({ data }: TrafficChartProps) {
             <Area
               type="monotone"
               dataKey="suspicious"
-              stroke="#ef4444"
+              stroke={COLORS.suspicious}
               strokeWidth={2}
               fill="url(#gradSuspicious)"
               dot={false}

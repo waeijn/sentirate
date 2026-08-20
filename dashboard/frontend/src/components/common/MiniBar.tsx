@@ -6,13 +6,13 @@ interface MiniBarProps {
 export function MiniBar({ value, color }: MiniBarProps) {
   const clamped = Math.min(1, Math.max(0, value));
 
-  // Auto-color based on value if not provided
+  // Auto-color based on value — matches Figma classification thresholds
   const autoColor =
     clamped > 0.7
-      ? "var(--suspicious)"
+      ? "var(--suspicious)" // #f87171
       : clamped > 0.4
-        ? "var(--bursty)"
-        : "var(--normal)";
+        ? "var(--bursty)" // #fbbf24
+        : "var(--normal)"; // #4ade80
 
   const barColor = color ?? autoColor;
 
@@ -42,11 +42,12 @@ export function MiniBar({ value, color }: MiniBarProps) {
       <span
         style={{
           fontSize: 12,
-          color: "var(--text-dim)",
+          color: barColor,
           fontFamily: "var(--font-mono)",
           width: 32,
           textAlign: "right",
           flexShrink: 0,
+          fontWeight: 600,
         }}
       >
         {clamped.toFixed(2)}
