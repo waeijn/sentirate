@@ -165,6 +165,10 @@ async def _build_metrics_payload(limiter: AdaptiveRateLimiter) -> dict:
             "justification":    entry.get("justification", ""),
         })
 
+    rar_val = metrics.get("rar")
+    fpr_val = metrics.get("fpr")
+    fnr_val = metrics.get("fnr")
+
     return {
         "timestamp": str(int(now * 1000)),
         "summary": {
@@ -172,9 +176,9 @@ async def _build_metrics_payload(limiter: AdaptiveRateLimiter) -> dict:
             "total_accepted":  total_accepted,
             "total_rejected":  total_rejected,
             "total_requests":  metrics.get("total_requests", 0),
-            "rar_percent":     round(metrics.get("rar", 1.0) * 100, 2),
-            "fpr_percent":     round(metrics.get("fpr", 0.0) * 100, 2),
-            "fnr_percent":     round(metrics.get("fnr", 0.0) * 100, 2),
+            "rar_percent":     round((rar_val if rar_val is not None else 1.0) * 100, 2),
+            "fpr_percent":     round((fpr_val if fpr_val is not None else 0.0) * 100, 2),
+            "fnr_percent":     round((fnr_val if fnr_val is not None else 0.0) * 100, 2),
             "avg_latency_ms":  metrics.get("avg_latency_ms", 0.0),
             "p95_latency_ms":  metrics.get("p95_latency_ms", 0.0),
             "classifications": classifications,

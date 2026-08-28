@@ -3,6 +3,7 @@ interface TopBarProps {
   connected: boolean;
   isDark: boolean;
   onToggleTheme: () => void;
+  onResetState?: () => void;
 }
 
 export function TopBar({
@@ -10,6 +11,7 @@ export function TopBar({
   connected,
   isDark,
   onToggleTheme,
+  onResetState,
 }: TopBarProps) {
   return (
     <header
@@ -70,6 +72,31 @@ export function TopBar({
 
         {/* Divider */}
         <div style={{ width: 1, height: 18, background: "var(--border)" }} />
+
+        {/* Reset Metrics */}
+        {onResetState && (
+          <button
+            onClick={onResetState}
+            title="Reset all backend metrics and clear charts"
+            style={{
+              background: "var(--bg-hover)",
+              border: "1px solid var(--border)",
+              color: "var(--suspicious)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "5px 12px",
+              borderRadius: "var(--radius-sm)",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.background = "var(--border)")}
+            onMouseOut={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+          >
+            Reset Metrics
+          </button>
+        )}
 
         {/* Theme toggle — matches Figma sun/moon icon */}
         <button

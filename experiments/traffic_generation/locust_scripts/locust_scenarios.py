@@ -59,10 +59,17 @@ def filter_by_profile(environment, **kwargs):
         print(f"\n>>> WARNING: unknown profile '{profile}' — running MIXED (all three, weighted)\n")
 
 
-# ── Thread-safe unique IP per user ────────────────────────────────────────────
+# ── Thread-safe unique IP per user (Distributed-Safe) ───────────────
 
 _ip_lock    = threading.Lock()
-_ip_counter = {"normal": 0, "bursty": 0, "suspicious": 0}
+# Start with a random offset so multiple Locust worker processes don't 
+# generate identical IP addresses and collide.
+_worker_offset = random.randint(0, 1000000)
+_ip_counter = {
+    "normal": _worker_offset, 
+    "bursty": _worker_offset, 
+    "suspicious": _worker_offset
+}
 
 
 def _next_ip(category: str) -> str:

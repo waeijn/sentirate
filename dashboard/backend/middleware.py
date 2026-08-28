@@ -17,6 +17,7 @@ from typing import Optional
 import redis.asyncio as aioredis
 from redis.exceptions import NoScriptError
 from heuristic_worker import HeuristicTaskQueue
+from metrics_accumulator import MetricsAccumulator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,14 +56,25 @@ LATENCY_MAXLEN = 2000
 
 LUA_CONSUME_BUCKET = """
 local bkey        = KEYS[1]
-local now         = tonumber(ARGV[1])
-local capacity    = tonumber(ARGV[2])
-local refill      = tonumber(ARGV[3])
-local cost        = tonumber(ARGV[4])
-local ttl         = tonumber(ARGV[5])
+local state_key   = KEYS[2]
+local time_arr    = redis.call('TIME')
+local now         = tonumber(time_arr[1]) + tonumber(time_arr[2]) / 1000000.0
+local cost        = tonumber(ARGV[1])
+local ttl         = tonumber(ARGV[2])
 
-if capacity == 0 then
-    return {0, 0}
+local class_str   = redis.call('HGET', state_key, 'classification')
+if not class_str or class_str == "" then
+    class_str = "normal"
+end
+
+local capacity = 20
+local refill   = 10
+if class_str == "suspicious" then
+    capacity = 5
+    refill   = 2
+elseif class_str == "bursty" then
+    capacity = 40
+    refill   = 20
 end
 
 local data        = redis.call('HMGET', bkey, 'tokens', 'last_refill')
@@ -81,7 +93,7 @@ end
 redis.call('HSET',   bkey, 'tokens', tokens, 'last_refill', now)
 redis.call('EXPIRE', bkey, ttl)
 
-return {allowed, math.floor(tokens * 100)}
+return {allowed, math.floor(tokens * 100), class_str}
 """
 
 
@@ -99,6 +111,35 @@ class AdaptiveRateLimiter:
         self._lua_sha: Optional[str] = None
         self._load_lock = asyncio.Lock()
         self._worker_queue = HeuristicTaskQueue(self, eval_interval=1.0)
+        # In-memory classification cache — eliminates Redis hget per request
+        self._class_cache: dict[str, TrafficClass] = {}
+        # Batched metrics accumulator — eliminates per-request Redis pipelines
+        self._metrics_acc: MetricsAccumulator | None = None  # initialized in start_background
+        
+        # Cache for get_metrics to prevent CPU starvation
+        self._metrics_cache: dict | None = None
+        self._metrics_cache_time: float = 0.0
+
+    # ------------------------------------------------------------------
+    # Lifecycle — called from main.py lifespan
+    # ------------------------------------------------------------------
+
+    def start_background(self) -> None:
+        """Start the metrics accumulator flush loop and heuristic workers."""
+        self._metrics_acc = MetricsAccumulator(
+            redis_getter=lambda: self._redis,
+            flush_interval=1.0,
+        )
+        self._metrics_acc.start()
+        self._worker_queue.start()
+        logger.info("Background tasks started (accumulator + heuristic workers).")
+
+    def stop_background(self) -> None:
+        """Stop all background tasks."""
+        self._worker_queue.stop()
+        if self._metrics_acc:
+            self._metrics_acc.stop()
+        logger.info("Background tasks stopped.")
 
     @property
     def _redis(self) -> aioredis.Redis:
@@ -161,54 +202,52 @@ class AdaptiveRateLimiter:
         start_perf = time.perf_counter()
         now = time.time()
 
-        state_key = self._k(ip, "state")
-        raw_class = await self._redis.hget(state_key, "classification")
-        if not raw_class:
-            classification = self._initial_class_from_ip(ip)
-            pipe = self._redis.pipeline()
-            pipe.hset(state_key, "classification", classification.value)
-            pipe.pfadd(f"{REDIS_NS}:_unique_ips", ip)
-            pipe.sadd(f"{REDIS_NS}:_ips:{classification.value}", ip)
-            await pipe.execute()
-        else:
-            classification = TrafficClass(raw_class.decode("utf-8") if isinstance(raw_class, bytes) else raw_class)
-
-        capacity, refill_rate = BUCKET_PROFILES[classification.value]
-
-        result      = await self._evalsha(
-            self._lua_sha, 1,
-            self._k(ip, "bucket"),
-            str(now), str(capacity), str(refill_rate), "1", str(BUCKET_TTL),
+        # 1. Token bucket + classification: single Redis RTT
+        result = await self._evalsha(
+            self._lua_sha, 2,
+            self._k(ip, "bucket"), self._k(ip, "state"),
+            "1", str(BUCKET_TTL),
         )
         allowed     = bool(int(result[0]))
         tokens_left = int(result[1]) / 100.0
+        class_str   = result[2]
+        if isinstance(class_str, bytes):
+            class_str = class_str.decode('utf-8')
+        
+        try:
+            classification = TrafficClass(class_str)
+        except ValueError:
+            classification = TrafficClass.NORMAL
+
         decision    = "ADMITTED" if allowed else "BLOCKED"
+        capacity, refill_rate = BUCKET_PROFILES[classification.value]
         retry       = round(1.0 / refill_rate, 3) if refill_rate > 0 else 999
 
-        logger.debug(
-            "hot | ip=%-15s class=%-10s tokens=%6.2f decision=%s",
-            ip, classification.value, tokens_left, decision,
-        )
+        latency_ms = (time.perf_counter() - start_perf) * 1000
 
-        latency_ms = (time.perf_counter() - start_perf) * 1000     
-        
-        if decision == "BLOCKED":
-            asyncio.create_task(
-                self._update_blocked_metrics(ip, now, classification, latency_ms, decision="BLOCKED"),
-                name=f"blk:{ip}",
+        # 2. Record metrics in accumulator: O(1), zero I/O
+        gt_class   = self._gt_class(ip, classification)
+        window_key = self._k(ip, "window")
+        if self._metrics_acc:
+            self._metrics_acc.record(
+                ip, now, gt_class, classification.value,
+                decision, latency_ms, window_key,
             )
-        else:
+
+        # 3. Queue heuristic evaluation for ADMITTED requests only
+        if decision == "ADMITTED":
             self._worker_queue.submit(
                 ip, now, classification, tokens_left, decision, endpoint, latency_ms
             )
-        
+
+        # 4. Return immediately
         return {
             "decision":       decision,
             "traffic_type":   classification.value,
             "classification": classification.value,
             "justification": (
                 f"Request from {ip} {decision.lower()}. "
-                f"Profile: {classification.value} — r={refill_rate} tok/s, b={capacity:.0f} tokens. "
+                f"Profile: {classification.value} | r={refill_rate} tok/s, b={capacity:.0f} tokens. "
                 f"Tokens remaining: {tokens_left:.1f}/{capacity:.0f}. "
                 f"Full behavioral analysis available after heuristic computation."
             ),
@@ -228,64 +267,94 @@ class AdaptiveRateLimiter:
             "monitor_totals": {},
         }
 
-    # =========================================================================
-    # COLD PATH
-    # =========================================================================
+    # ------------------------------------------------------------------
+    # Helper: ground-truth class from Locust IP ranges
+    # ------------------------------------------------------------------
 
-    async def _update_blocked_metrics(
-        self,
-        ip:             str,
-        now:            float,
-        current_class:  TrafficClass,
-        latency_ms:     float,
-        decision:       str = "BLOCKED",
-    ) -> None:
-        """Lightweight metric update — no sliding-window math or heuristic eval."""
+    @staticmethod
+    def _gt_class(ip: str, classification: TrafficClass) -> str:
+        if ip.startswith("203.0."):
+            return "suspicious"
+        if ip.startswith("10.0."):
+            parts = ip.split(".")
+            try:
+                return "bursty" if int(parts[2]) >= 50 else "normal"
+            except (IndexError, ValueError):
+                return "normal"
+        return classification.value
+
+    # ------------------------------------------------------------------
+    # Helper: fire-and-forget Redis init for new IPs
+    # ------------------------------------------------------------------
+
+    async def _init_ip_redis(self, ip: str, classification: TrafficClass) -> None:
         try:
-            import uuid
-            window_key = self._k(ip, "window")
-            member = f"{now:.6f}:{uuid.uuid4().hex[:8]}"
-            state_key = self._k(ip, "state")
-            metrics_key = f"{REDIS_NS}:_metrics"
-            
-            if ip.startswith("203.0."):
-                gt_class = "suspicious"
-            elif ip.startswith("10.0."):
-                parts = ip.split(".")
-                try:
-                    gt_class = "bursty" if int(parts[2]) >= 50 else "normal"
-                except (IndexError, ValueError):
-                    gt_class = "normal"
-            else:
-                gt_class = current_class.value
-
             pipe = self._redis.pipeline(transaction=False)
-            pipe.zadd(window_key, {member: now})
-            pipe.expire(window_key, BUCKET_TTL)
-            
-            pipe.hincrby(state_key, "request_count", 1)
-            if decision == "BLOCKED":
-                pipe.hincrby(state_key, "total_rejected", 1)
-            else:
-                pipe.hincrby(state_key, "total_accepted", 1)
-            pipe.hset(state_key, "last_seen", str(now))
-            
-            pipe.hincrby(metrics_key, "total_requests", 1)
-            if decision == "BLOCKED":
-                pipe.hincrby(metrics_key, "blocked", 1)
-                pipe.hincrby(metrics_key, f"{gt_class}_blocked", 1)
-            else:
-                pipe.hincrby(metrics_key, "admitted", 1)
-                pipe.hincrby(metrics_key, f"{gt_class}_admitted", 1)
-            pipe.hincrby(metrics_key, f"{gt_class}_total", 1)
-            
-            pipe.lpush(LATENCY_KEY, str(latency_ms))
-            pipe.ltrim(LATENCY_KEY, 0, LATENCY_MAXLEN - 1)
-            
+            pipe.hset(self._k(ip, "state"), "classification", classification.value)
+            pipe.pfadd(f"{REDIS_NS}:_unique_ips", ip)
+            pipe.sadd(f"{REDIS_NS}:_ips:{classification.value}", ip)
             await pipe.execute()
-        except Exception as e:
-            logger.error("Lightweight metric update failed: %s", e)
+        except Exception:
+            logger.debug("Failed to init Redis state for %s (will retry on next eval)", ip)
 
+    # =========================================================================
+    # COLD PATH (Heuristic Evaluation & State Persistence)
+    # =========================================================================
+
+    @staticmethod
+    def _compute_heuristics(
+        raw_timestamps: list[bytes | str],
+        current_class: TrafficClass,
+        ip: str
+    ) -> tuple[TrafficClass, float, float, float, float]:
+        import math
+        from middleware import AdaptiveRateLimiter
+
+        lam, sigma, burst_rate_per_min, persistence = 0.0, 0.0, 0.0, 0.0
+        new_class = current_class
+
+        if len(raw_timestamps) >= 2:
+            timestamps = [
+                float(ts.decode("utf-8").split(":")[0]) if isinstance(ts, bytes) else float(ts.split(":")[0])
+                for ts in raw_timestamps
+            ]
+            span = timestamps[-1] - timestamps[0]
+            effective_span = max(span, 0.001)
+            lam = len(timestamps) / effective_span
+
+            sigma_timestamps = timestamps[-100:] if len(timestamps) > 100 else timestamps
+            if len(sigma_timestamps) >= 2:
+                intervals = [sigma_timestamps[i] - sigma_timestamps[i - 1] for i in range(1, len(sigma_timestamps))]
+                mean_iv = sum(intervals) / len(intervals)
+                sigma = math.sqrt(sum((iv - mean_iv) ** 2 for iv in intervals) / len(intervals))
+            else:
+                sigma = 0.0
+
+            burst_event_times = [
+                timestamps[i] for i in range(1, len(timestamps))
+                if (timestamps[i] - timestamps[i - 1]) < BURST_IV_MS / 1000.0
+            ]
+            burst_count = len(burst_event_times)
+            burst_rate_per_min = (burst_count / effective_span) * 60.0
+
+            persistence = 0.0
+            if burst_event_times:
+                current_chain_start = burst_event_times[0]
+                last_event_time = burst_event_times[0]
+                for t in burst_event_times[1:]:
+                    if t - last_event_time <= (BURST_IV_MS / 1000.0) * 1.5:
+                        pass
+                    else:
+                        persistence = max(persistence, last_event_time - current_chain_start)
+                        current_chain_start = t
+                    last_event_time = t
+                persistence = max(persistence, last_event_time - current_chain_start)
+
+            new_class = AdaptiveRateLimiter._classify(
+                lam, sigma, burst_rate_per_min, persistence, len(timestamps), current_class
+            )
+
+        return new_class, lam, sigma, burst_rate_per_min, persistence
 
     async def _post_request_tasks(
         self,
@@ -299,16 +368,19 @@ class AdaptiveRateLimiter:
         latency_ms:     float,
     ) -> None:
         try:
-            # =================================================================
-            # PIPELINE 1: Window append and fetch
-            # =================================================================
-            import uuid
+            # 1. Drain pending window entries from accumulator
             window_key = self._k(ip, "window")
             errors_key = self._k(ip, "errors")
-            member = f"{now:.6f}:{uuid.uuid4().hex[:8]}"
+            pending_entries = {}
+            if self._metrics_acc:
+                pending_entries = self._metrics_acc.drain_window_entries(window_key)
+
+            # Ensure current request is also in the entries (if not already handled by accumulator before calling this)
+            # Actually, the accumulator was called before submit(), so it's in pending_entries.
 
             pipe = self._redis.pipeline(transaction=False)
-            pipe.zadd(window_key, {member: now})
+            if pending_entries:
+                pipe.zadd(window_key, pending_entries)
             pipe.zremrangebyscore(window_key, "-inf", now - RATE_WINDOW_SECONDS)
             pipe.zremrangebyrank(window_key, 0, -WINDOW_MAXLEN - 1)
             pipe.zrange(window_key, 0, -1)
@@ -317,156 +389,74 @@ class AdaptiveRateLimiter:
                 pipe.hincrby(errors_key, "errors", 1)
             pipe.expire(window_key, BUCKET_TTL)
             pipe.expire(errors_key, BUCKET_TTL)
-            
+
             results = await pipe.execute()
-            raw_timestamps = results[3]
+            raw_timestamps = results[3 if pending_entries else 2] # zrange result index depends on if zadd was called
 
-            # =================================================================
-            # LOCAL COMPUTE: Heuristic Math
-            # =================================================================
-            lam, sigma, burst_rate_per_min, persistence = 0.0, 0.0, 0.0, 0.0
-            new_class = current_class
-            
-            if len(raw_timestamps) >= 2:
-                timestamps = [float(ts.decode("utf-8").split(":")[0]) if isinstance(ts, bytes) else float(ts.split(":")[0]) for ts in raw_timestamps]
-                span = timestamps[-1] - timestamps[0]
-                effective_span = max(span, 1.0)
-                lam = len(timestamps) / effective_span
-                
-                # Use only the last 100 requests for sigma to remain sensitive to recent behavior
-                sigma_timestamps = timestamps[-100:] if len(timestamps) > 100 else timestamps
-                if len(sigma_timestamps) >= 2:
-                    intervals = [sigma_timestamps[i] - sigma_timestamps[i-1] for i in range(1, len(sigma_timestamps))]
-                    mean_iv = sum(intervals) / len(intervals)
-                    sigma = math.sqrt(sum((iv - mean_iv) ** 2 for iv in intervals) / len(intervals))
-                else:
-                    sigma = 0.0
+            # 2. Local Compute: Heuristic Math (Thread Pooled)
+            new_class, lam, sigma, burst_rate_per_min, persistence = await asyncio.to_thread(
+                self._compute_heuristics, raw_timestamps, current_class, ip
+            )
 
-                burst_event_times = [
-                    timestamps[i] for i in range(1, len(timestamps))
-                    if (timestamps[i] - timestamps[i - 1]) < BURST_IV_MS / 1000.0
-                ]
-                burst_count = len(burst_event_times)
-                burst_rate_per_min = (burst_count / effective_span) * 60.0
+            logger.debug(
+                "[CLI LOG] IP: %-15s | Eval → Class: %-10s | λ: %6.2f req/s | σ: %.4fs | BurstFreq: %5.1f/min | Persist: %5.1fs",
+                ip, new_class.value.upper(), lam, sigma, burst_rate_per_min, persistence
+            )
 
-                # Persistence: maximum duration of any continuous burst chain in the window
-                persistence = 0.0
-                if burst_event_times:
-                    current_chain_start = burst_event_times[0]
-                    last_event_time = burst_event_times[0]
-                    for t in burst_event_times[1:]:
-                        if t - last_event_time <= (BURST_IV_MS / 1000.0) * 1.5:  # contiguous if within 1.5x the burst interval
-                            pass
-                        else:
-                            # chain broken, record max persistence
-                            persistence = max(persistence, last_event_time - current_chain_start)
-                            current_chain_start = t
-                        last_event_time = t
-                    persistence = max(persistence, last_event_time - current_chain_start)
-                
-                new_class = self._classify(lam, sigma, burst_rate_per_min, persistence, len(timestamps), current_class)
-                
-                logger.info(
-                    "[CLI LOG] IP: %-15s | Eval → Class: %-10s | λ: %6.2f req/s | σ: %.4fs | BurstFreq: %5.1f/min | Persist: %5.1fs",
-                    ip, new_class.value.upper(), lam, sigma, burst_rate_per_min, persistence
-                )
-                
-                if new_class != current_class:
-                    logger.warning(
-                        "class_change | ip=%-15s  %s → %s  (λ=%.2f, σ=%.4f)",
-                        ip, current_class.value, new_class.value, lam, sigma,
-                    )
-                    if self._sio:
-                        await self._sio.emit("classification_change", {
-                            "ip":          ip,
-                            "from":        current_class.value,
-                            "to":          new_class.value,
-                            "lambda":      round(lam, 4),
-                            "sigma":       round(sigma, 4),
-                            "burst_freq":  round(burst_rate_per_min, 1),
-                            "persistence": round(persistence, 1),
-                            "ts":          now,
-                        })
-
-            markers = {
-                "lambda": round(lam, 2), "sigma": round(sigma, 4),
-                "burst_freq": round(burst_rate_per_min, 1), "persistence": round(persistence, 1)
-            }
-
-            # =================================================================
-            # PIPELINE 2: State, Metrics, Latency, and Logging
-            # =================================================================
-            pipe = self._redis.pipeline(transaction=False)
-            
-            # State Update
-            state_key = self._k(ip, "state")
-            pipe.hincrby(state_key, "request_count", 1)
-            if decision == "ADMITTED":
-                pipe.hincrby(state_key, "total_accepted", 1)
-            else:
-                pipe.hincrby(state_key, "total_rejected", 1)
-                
-            state_mapping = {
-                "last_seen":         str(now),
-                "classification":    new_class.value,
-                "lambda":            str(lam),
-                "sigma":             str(sigma),
-                "burst_freq":        str(burst_rate_per_min),
-                "burst_persistence": str(persistence),
-            }
+            # 3. State update & Websocket emit if class changed
             if new_class != current_class:
-                state_mapping["classified_at"] = str(now)
+                self._class_cache[ip] = new_class  # Update cache
+                logger.warning(
+                    "class_change | ip=%-15s  %s → %s  (λ=%.2f, σ=%.4f)",
+                    ip, current_class.value, new_class.value, lam, sigma,
+                )
+                if self._sio:
+                    await self._sio.emit("classification_change", {
+                        "ip":          ip,
+                        "from":        current_class.value,
+                        "to":          new_class.value,
+                        "lambda":      round(lam, 4),
+                        "sigma":       round(sigma, 4),
+                        "burst_freq":  round(burst_rate_per_min, 1),
+                        "persistence": round(persistence, 1),
+                        "ts":          now,
+                    })
+
+                pipe = self._redis.pipeline(transaction=False)
                 new_cap, new_rfill = BUCKET_PROFILES[new_class.value]
                 pipe.hset(self._k(ip, "bucket"), mapping={
                     "tokens":      str(float(new_cap)),
                     "last_refill": str(now),
                 })
                 pipe.expire(self._k(ip, "bucket"), BUCKET_TTL)
-                # Dashboard live classification sets
+                pipe.hset(self._k(ip, "state"), mapping={
+                    "classification":    new_class.value,
+                    "classified_at":     str(now),
+                    "lambda":            str(lam),
+                    "sigma":             str(sigma),
+                    "burst_freq":        str(burst_rate_per_min),
+                    "burst_persistence": str(persistence),
+                })
                 pipe.srem(f"{REDIS_NS}:_ips:{current_class.value}", ip)
                 pipe.sadd(f"{REDIS_NS}:_ips:{new_class.value}", ip)
-            pipe.hset(state_key, mapping=state_mapping)
-            pipe.expire(state_key, BUCKET_TTL)
-
-            # Global Metrics — ground-truth class from Locust IP ranges
-            # Normal: 10.0.[1-49].*, Bursty: 10.0.[50+].*, Suspicious: 203.0.*
-            if ip.startswith("203.0."):
-                gt_class = "suspicious"
-            elif ip.startswith("10.0."):
-                parts = ip.split(".")
-                try:
-                    gt_class = "bursty" if int(parts[2]) >= 50 else "normal"
-                except (IndexError, ValueError):
-                    gt_class = "normal"
+                await pipe.execute()
             else:
-                gt_class = new_class.value
+                # Update heuristic metrics in state even if class didn't change
+                pipe = self._redis.pipeline(transaction=False)
+                pipe.hset(self._k(ip, "state"), mapping={
+                    "lambda":            str(lam),
+                    "sigma":             str(sigma),
+                    "burst_freq":        str(burst_rate_per_min),
+                    "burst_persistence": str(persistence),
+                })
+                await pipe.execute()
 
-            metrics_key = f"{REDIS_NS}:_metrics"
-            pipe.hincrby(metrics_key, "total_requests", 1)
-            if decision == "ADMITTED":
-                pipe.hincrby(metrics_key, "admitted", 1)
-                pipe.hincrby(metrics_key, f"{gt_class}_admitted", 1)
-            else:
-                pipe.hincrby(metrics_key, "blocked", 1)
-                pipe.hincrby(metrics_key, f"{gt_class}_blocked", 1)
-            pipe.hincrby(metrics_key, f"{gt_class}_total", 1)
-            pipe.expire(metrics_key, 86400)
+            markers = {
+                "lambda": round(lam, 2), "sigma": round(sigma, 4),
+                "burst_freq": round(burst_rate_per_min, 1), "persistence": round(persistence, 1)
+            }
 
-            # Dashboard Sets
-            pipe.pfadd(f"{REDIS_NS}:_unique_ips", ip)
-            pipe.expire(f"{REDIS_NS}:_unique_ips", 86400)
-            for cls in ("normal", "bursty", "suspicious"):
-                if cls != new_class.value:
-                    pipe.srem(f"{REDIS_NS}:_ips:{cls}", ip)
-            pipe.sadd(f"{REDIS_NS}:_ips:{new_class.value}", ip)
-            pipe.expire(f"{REDIS_NS}:_ips:{new_class.value}", 86400)
-
-            # Latency
-            pipe.lpush(LATENCY_KEY, f"{latency_ms:.3f}")
-            pipe.ltrim(LATENCY_KEY, 0, LATENCY_MAXLEN - 1)
-            pipe.expire(LATENCY_KEY, 3600)
-
-            # Logging
+            # 4. Logging for Dashboard
             cap, rfill = BUCKET_PROFILES[new_class.value]
             entry = json.dumps({
                 "ip":             ip,
@@ -486,10 +476,10 @@ class AdaptiveRateLimiter:
                 "endpoint": endpoint,
             })
             log_key = f"{REDIS_NS}:_log"
+            pipe = self._redis.pipeline(transaction=False)
             pipe.lpush(log_key, entry)
             pipe.ltrim(log_key, 0, LOG_MAX - 1)
             pipe.expire(log_key, 86400)
-
             await pipe.execute()
 
         except Exception:
@@ -644,6 +634,10 @@ class AdaptiveRateLimiter:
         return clients
 
     async def get_metrics(self) -> dict:
+        now = time.time()
+        if self._metrics_cache and (now - self._metrics_cache_time) < 1.0:
+            return self._metrics_cache
+
         metrics_pipe = self._redis.pipeline(transaction=False)
         metrics_pipe.hgetall(f"{REDIS_NS}:_metrics")
         metrics_pipe.pfcount(f"{REDIS_NS}:_unique_ips")
@@ -681,14 +675,9 @@ class AdaptiveRateLimiter:
         legitimate_admitted = normal_admitted + bursty_admitted
         legitimate_blocked  = normal_blocked + bursty_blocked
 
-        if legitimate_total > 0:
-            rar = legitimate_admitted / legitimate_total
-        elif suspicious_total > 0:
-            rar = 0.0
-        else:
-            rar = 1.0
-        fpr = legitimate_blocked  / legitimate_total if legitimate_total > 0 else 0.0
-        fnr = suspicious_admitted / suspicious_total if suspicious_total > 0 else 0.0
+        rar = round(legitimate_admitted / legitimate_total, 4) if legitimate_total > 0 else None
+        fpr = round(legitimate_blocked / legitimate_total, 4) if legitimate_total > 0 else None
+        fnr = round(suspicious_admitted / suspicious_total, 4) if suspicious_total > 0 else None
 
         raw_latencies = await self._redis.lrange(LATENCY_KEY, 0, LATENCY_MAXLEN - 1)
         latencies = []
@@ -706,10 +695,10 @@ class AdaptiveRateLimiter:
             p95_idx        = max(0, int(len(sorted_lat) * 0.95) - 1)
             p95_latency_ms = round(sorted_lat[p95_idx], 2)
 
-        return {
-            "rar":              round(rar, 4),
-            "fpr":              round(fpr, 4),
-            "fnr":              round(fnr, 4),
+        result = {
+            "rar":              rar,
+            "fpr":              fpr,
+            "fnr":              fnr,
             "total_requests":   total,
             "total_admitted":   admitted,
             "total_blocked":    blocked,
@@ -722,6 +711,9 @@ class AdaptiveRateLimiter:
             "suspicious_total": suspicious_total,
             "blocked_total":    int(data.get("blocked_total",   0)),
         }
+        self._metrics_cache = result
+        self._metrics_cache_time = now
+        return result
 
     async def get_log(self) -> list[dict]:
         raw     = await self._redis.lrange(f"{REDIS_NS}:_log", 0, LOG_MAX - 1)
@@ -734,9 +726,12 @@ class AdaptiveRateLimiter:
         return entries
 
     async def reset_all(self) -> None:
+        self._class_cache.clear()
+        if self._metrics_acc:
+            self._metrics_acc.clear()
         keys: list[str] = []
         async for key in self._redis.scan_iter(f"{REDIS_NS}:*"):
             keys.append(key)
         if keys:
             await self._redis.delete(*keys)
-        logger.info("reset_all: deleted %d Redis keys.", len(keys))
+        logger.info("reset_all: deleted %d Redis keys and cleared in-memory state.", len(keys))

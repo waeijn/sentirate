@@ -1,4 +1,4 @@
-﻿"""
+"""
 main.py
 ========
 Application entry point — Redis-backed version.
@@ -76,7 +76,9 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up — connecting to Redis at %s", REDIS_URL)
     await rc.initialise(REDIS_URL)  
     logger.info("Redis ready.")
+    shared_limiter.start_background()
     yield
+    shared_limiter.stop_background()
     logger.info("Shutting down — closing Redis connection pool.")
     await rc.close()
 

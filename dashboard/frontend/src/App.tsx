@@ -307,6 +307,23 @@ export default function App() {
 
   const toggleTheme = () => setIsDark((d) => !d);
 
+  const handleResetMetrics = async () => {
+    try {
+      await fetch(BACKEND + "/api/clients", { method: "DELETE" });
+      setChartData([]);
+      setLogs([]);
+      setStats((prev) =>
+        prev.map((s) =>
+          s.label === "Request Acceptance Rate" ? { ...s, value: "100.0" } : { ...s, value: "0" }
+        )
+      );
+      setAnalytics({ fpr: 0, fnr: 0, tpr: 100, tnr: 100, accuracy: 100 });
+      prevTotalRef.current = 0;
+    } catch (err) {
+      console.error("Failed to reset metrics:", err);
+    }
+  };
+
   // ─── Socket connection ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -530,6 +547,7 @@ export default function App() {
           connected={connected}
           isDark={isDark}
           onToggleTheme={toggleTheme}
+          onResetState={handleResetMetrics}
         />
 
         <main style={{ flex: 1, overflowY: "auto" }}>
