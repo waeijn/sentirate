@@ -141,11 +141,16 @@ class NormalUser(HttpUser):
 
     @task(9)
     def api_call(self):
-        self.client.post(
+        with self.client.post(
             f"/api/request/{self.spoofed_ip}",
             headers={"X-Forwarded-For": self.spoofed_ip},
             name="/api/request [normal]",
-        )
+            catch_response=True,
+        ) as response:
+            if response.status_code == 429:
+                response.success()
+            elif response.status_code >= 500:
+                response.failure(f"Server Error: {response.status_code}")
 
     @task(1)
     def check_metrics(self):
@@ -171,11 +176,16 @@ class BurstyUser(HttpUser):
         cycle_position = (time.time() + self._burst_phase) % 35
         if cycle_position < 15:
             # Active burst window
-            self.client.post(
+            with self.client.post(
                 f"/api/request/{self.spoofed_ip}",
                 headers={"X-Forwarded-For": self.spoofed_ip},
                 name="/api/request [bursty]",
-            )
+                catch_response=True,
+            ) as response:
+                if response.status_code == 429:
+                    response.success()
+                elif response.status_code >= 500:
+                    response.failure(f"Server Error: {response.status_code}")
         else:
             # Quiet period — sleep instead of sending
             time.sleep(random.uniform(0.5, 2.0))

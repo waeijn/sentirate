@@ -16,6 +16,7 @@ from typing import Optional
 
 import redis.asyncio as aioredis
 from redis.exceptions import NoScriptError
+from heuristic_worker import HeuristicTaskQueue
 
 logging.basicConfig(
     level=logging.INFO,
@@ -97,6 +98,7 @@ class AdaptiveRateLimiter:
         self._sio = sio
         self._lua_sha: Optional[str] = None
         self._load_lock = asyncio.Lock()
+        self._worker_queue = HeuristicTaskQueue(self, eval_interval=1.0)
 
     @property
     def _redis(self) -> aioredis.Redis:
@@ -161,21 +163,15 @@ class AdaptiveRateLimiter:
 
         state_key = self._k(ip, "state")
         raw_class = await self._redis.hget(state_key, "classification")
-
-        if raw_class:
-            classification = TrafficClass(raw_class)
-        else:
-            # First-ever request — use IP subnet hint for initial bucket.
-            # This is standard WAF practice (IP reputation), not cheating.
-            # The heuristic engine reclassifies based on behavior once
-            # enough history accumulates.
+        if not raw_class:
             classification = self._initial_class_from_ip(ip)
-            await self._redis.hset(state_key, "classification", classification.value)
-
-        # Update last_seen INLINE so it never goes stale under load.
-        # Classification changes are handled by the heuristic classifier
-        # in the cold path — no timer-based expiration needed.
-        await self._redis.hset(state_key, "last_seen", str(now))
+            pipe = self._redis.pipeline()
+            pipe.hset(state_key, "classification", classification.value)
+            pipe.pfadd(f"{REDIS_NS}:_unique_ips", ip)
+            pipe.sadd(f"{REDIS_NS}:_ips:{classification.value}", ip)
+            await pipe.execute()
+        else:
+            classification = TrafficClass(raw_class.decode("utf-8") if isinstance(raw_class, bytes) else raw_class)
 
         capacity, refill_rate = BUCKET_PROFILES[classification.value]
 
@@ -195,16 +191,15 @@ class AdaptiveRateLimiter:
         )
 
         latency_ms = (time.perf_counter() - start_perf) * 1000     
+        
         if decision == "BLOCKED":
             asyncio.create_task(
-                self._update_blocked_metrics(ip, now, classification, latency_ms),
+                self._update_blocked_metrics(ip, now, classification, latency_ms, decision="BLOCKED"),
                 name=f"blk:{ip}",
             )
         else:
-            asyncio.create_task(
-                self._post_request_tasks(ip, now, False, classification,
-                                         tokens_left, decision, endpoint, latency_ms),
-                name=f"post:{ip}",
+            self._worker_queue.submit(
+                ip, now, classification, tokens_left, decision, endpoint, latency_ms
             )
         
         return {
@@ -243,7 +238,9 @@ class AdaptiveRateLimiter:
         now:            float,
         current_class:  TrafficClass,
         latency_ms:     float,
+        decision:       str = "BLOCKED",
     ) -> None:
+        """Lightweight metric update — no sliding-window math or heuristic eval."""
         try:
             import uuid
             window_key = self._k(ip, "window")
@@ -267,12 +264,19 @@ class AdaptiveRateLimiter:
             pipe.expire(window_key, BUCKET_TTL)
             
             pipe.hincrby(state_key, "request_count", 1)
-            pipe.hincrby(state_key, "total_rejected", 1)
+            if decision == "BLOCKED":
+                pipe.hincrby(state_key, "total_rejected", 1)
+            else:
+                pipe.hincrby(state_key, "total_accepted", 1)
             pipe.hset(state_key, "last_seen", str(now))
             
             pipe.hincrby(metrics_key, "total_requests", 1)
-            pipe.hincrby(metrics_key, "blocked", 1)
-            pipe.hincrby(metrics_key, f"{gt_class}_blocked", 1)
+            if decision == "BLOCKED":
+                pipe.hincrby(metrics_key, "blocked", 1)
+                pipe.hincrby(metrics_key, f"{gt_class}_blocked", 1)
+            else:
+                pipe.hincrby(metrics_key, "admitted", 1)
+                pipe.hincrby(metrics_key, f"{gt_class}_admitted", 1)
             pipe.hincrby(metrics_key, f"{gt_class}_total", 1)
             
             pipe.lpush(LATENCY_KEY, str(latency_ms))
@@ -280,7 +284,7 @@ class AdaptiveRateLimiter:
             
             await pipe.execute()
         except Exception as e:
-            logger.error("Blocked metric update failed: %s", e)
+            logger.error("Lightweight metric update failed: %s", e)
 
 
     async def _post_request_tasks(
@@ -306,7 +310,7 @@ class AdaptiveRateLimiter:
             pipe = self._redis.pipeline(transaction=False)
             pipe.zadd(window_key, {member: now})
             pipe.zremrangebyscore(window_key, "-inf", now - RATE_WINDOW_SECONDS)
-            pipe.zremrangebyrank(window_key, 0, -401)
+            pipe.zremrangebyrank(window_key, 0, -WINDOW_MAXLEN - 1)
             pipe.zrange(window_key, 0, -1)
             pipe.hincrby(errors_key, "total", 1)
             if is_error:
@@ -326,16 +330,21 @@ class AdaptiveRateLimiter:
             if len(raw_timestamps) >= 2:
                 timestamps = [float(ts.decode("utf-8").split(":")[0]) if isinstance(ts, bytes) else float(ts.split(":")[0]) for ts in raw_timestamps]
                 span = timestamps[-1] - timestamps[0]
-                effective_span = max(span, 0.05)
+                effective_span = max(span, 1.0)
                 lam = len(timestamps) / effective_span
                 
-                intervals = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
-                mean_iv = sum(intervals) / len(intervals)
-                sigma = math.sqrt(sum((iv - mean_iv) ** 2 for iv in intervals) / len(intervals))
+                # Use only the last 100 requests for sigma to remain sensitive to recent behavior
+                sigma_timestamps = timestamps[-100:] if len(timestamps) > 100 else timestamps
+                if len(sigma_timestamps) >= 2:
+                    intervals = [sigma_timestamps[i] - sigma_timestamps[i-1] for i in range(1, len(sigma_timestamps))]
+                    mean_iv = sum(intervals) / len(intervals)
+                    sigma = math.sqrt(sum((iv - mean_iv) ** 2 for iv in intervals) / len(intervals))
+                else:
+                    sigma = 0.0
 
                 burst_event_times = [
                     timestamps[i] for i in range(1, len(timestamps))
-                    if intervals[i - 1] < BURST_IV_MS / 1000.0
+                    if (timestamps[i] - timestamps[i - 1]) < BURST_IV_MS / 1000.0
                 ]
                 burst_count = len(burst_event_times)
                 burst_rate_per_min = (burst_count / effective_span) * 60.0
@@ -413,6 +422,9 @@ class AdaptiveRateLimiter:
                     "last_refill": str(now),
                 })
                 pipe.expire(self._k(ip, "bucket"), BUCKET_TTL)
+                # Dashboard live classification sets
+                pipe.srem(f"{REDIS_NS}:_ips:{current_class.value}", ip)
+                pipe.sadd(f"{REDIS_NS}:_ips:{new_class.value}", ip)
             pipe.hset(state_key, mapping=state_mapping)
             pipe.expire(state_key, BUCKET_TTL)
 
@@ -557,29 +569,25 @@ class AdaptiveRateLimiter:
     
     @staticmethod
     def _classify(lam: float, sigma: float, burst_freq: float, persistence: float, history_len: int, current_class: TrafficClass) -> TrafficClass:
-        # Suspicious — A bot is identified by ANY of: extreme rate, machine-like regularity, or relentless persistence.
-        if lam > LAMBDA_BURSTY_MAX:
-            return TrafficClass.SUSPICIOUS
-        # sigma == 0.0 with few samples is unreliable (Windows clock batching) — require more history
-        if sigma == 0.0 and history_len >= 10:
-            return TrafficClass.SUSPICIOUS
-        # sigma > 0 but very low indicates machine-like regularity
-        if 0 < sigma < SIGMA_BOT_THRESHOLD and history_len >= 3:
-            return TrafficClass.SUSPICIOUS
-        if persistence > SUSPICIOUS_PERSIST_S:
+        import heuristic_engine
+
+        if current_class == TrafficClass.SUSPICIOUS:
             return TrafficClass.SUSPICIOUS
 
-        # Bursty — elevated rate or burst frequency
-        if lam > LAMBDA_NORMAL_MAX:
+        # Priority 1: SUSPICIOUS (Must meet extreme rate/burst AND machine-like regularity, OR relentless persistence)
+        if lam > heuristic_engine.BURSTY_RATE_MAX and sigma < heuristic_engine.SUSPICIOUS_SIGMA:
+            return TrafficClass.SUSPICIOUS
+        if burst_freq > heuristic_engine.SUSPICIOUS_BURST and sigma < heuristic_engine.SUSPICIOUS_SIGMA:
+            return TrafficClass.SUSPICIOUS
+        if persistence > heuristic_engine.SUSPICIOUS_PERSIST:
+            return TrafficClass.SUSPICIOUS
+
+        # Priority 2: BURSTY (Elevated metrics but lacking bot-like rigidity)
+        if (lam >= heuristic_engine.NORMAL_RATE_MAX or
+                burst_freq >= heuristic_engine.BURSTY_BURST_MIN or
+                persistence >= heuristic_engine.BURSTY_PERSIST_MIN):
             return TrafficClass.BURSTY
-        if burst_freq >= BURSTY_FREQ_MIN:
-            return TrafficClass.BURSTY
 
-        # If not enough history to make a behavioral judgment, stick to the current/initial class
-        if history_len < 3:
-            return current_class
-
-        # Normal — everything else
         return TrafficClass.NORMAL
 
     # =========================================================================
