@@ -1,4 +1,4 @@
-﻿"""
+"""
 main.py
 ========
 Application entry point — Redis-backed version.
@@ -154,14 +154,15 @@ socket_app = socketio.ASGIApp(sio, app)
 
 if __name__ == "__main__":
     import uvicorn
+    import sys
     host    = os.getenv("DASHBOARD_HOST", "localhost")
     port    = int(os.getenv("DASHBOARD_PORT", 8050))
-    workers = int(os.getenv("WORKERS", 8))
+    workers = 1 if sys.platform == "win32" else int(os.getenv("WORKERS", 8))
     uvicorn.run(
         "main:socket_app",
         host      = host,
         port      = port,
         workers   = workers,
         reload    = False,
-        log_level = os.getenv("LOG_LEVEL", "warning").lower(),
+        log_level = os.getenv("LOG_LEVEL", "info").lower(),
     )

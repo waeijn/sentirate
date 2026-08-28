@@ -71,14 +71,14 @@ def _next_ip(category: str) -> str:
         _ip_counter[category] += 1
 
     if category == "normal":
-        pool_idx = idx % 100
-        return f"10.0.{(pool_idx // 20) + 1}.{(pool_idx % 20) + 1}"
+        pool_idx = idx % 10000
+        return f"10.0.{(pool_idx // 250) + 1}.{(pool_idx % 250) + 1}"
     elif category == "bursty":
-        pool_idx = idx % 30
-        return f"10.0.{(pool_idx // 20) + 10}.{(pool_idx % 20) + 1}"
+        pool_idx = idx % 10000
+        return f"10.0.{(pool_idx // 250) + 50}.{(pool_idx % 250) + 1}"
     else:
-        pool_idx = idx % 10
-        return f"203.0.{(pool_idx // 10) + 113}.{(pool_idx % 10) + 1}"
+        pool_idx = idx % 10000
+        return f"203.0.{(pool_idx // 250) + 113}.{(pool_idx % 250) + 1}"
 
 
 # ── Realistic wait time generators ───────────────────────────────────────────

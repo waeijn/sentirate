@@ -34,7 +34,7 @@ async def initialise(url: str = "redis://localhost:6379/0") -> aioredis.Redis:
     global _client
     _client = aioredis.from_url(
         url,
-        max_connections       = 500,
+        max_connections       = 5000,
         socket_connect_timeout = 2.0,
         socket_timeout         = 1.0,
         retry_on_timeout       = True,
