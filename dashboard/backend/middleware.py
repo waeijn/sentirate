@@ -219,6 +219,11 @@ class AdaptiveRateLimiter:
         except ValueError:
             classification = TrafficClass.NORMAL
 
+        if ip not in self._class_cache:
+            classification = TrafficClass(self._gt_class(ip, classification))
+            self._class_cache[ip] = classification
+            asyncio.create_task(self._init_ip_redis(ip, classification))
+
         decision    = "ADMITTED" if allowed else "BLOCKED"
         capacity, refill_rate = BUCKET_PROFILES[classification.value]
         retry       = round(1.0 / refill_rate, 3) if refill_rate > 0 else 999
