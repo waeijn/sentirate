@@ -8,11 +8,11 @@ interface MonitoringProps {
   chartData: TrafficPoint[];
   alerts: Alert[];
   analytics?: {
-    fpr: number;
-    fnr: number;
-    tpr: number;
-    tnr: number;
-    accuracy: number;
+    fpr: number | null;
+    fnr: number | null;
+    tpr: number | null;
+    tnr: number | null;
+    accuracy: number | null;
   };
 }
 

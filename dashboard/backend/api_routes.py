@@ -170,22 +170,22 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
     async def get_config():
         """
         Returns the current threshold and token bucket profile configuration.
-        Values reflect Chapter 3 Table 2 (thresholds) and Table 3 (profiles).
-        Used by the Configuration page on the dashboard.
         """
+        import middleware
         return {
             "thresholds": {
-                "normal_rate_max":    NORMAL_RATE_MAX,
-                "bursty_rate_max":    BURSTY_RATE_MAX,
-                "suspicious_sigma":   SUSPICIOUS_SIGMA,
-                "suspicious_burst":   SUSPICIOUS_BURST,
-                "suspicious_persist": SUSPICIOUS_PERSIST,
-                "bursty_burst_min":   BURSTY_BURST_MIN,
-                "bursty_persist_min": BURSTY_PERSIST_MIN,
+                "normal_rate_max":    middleware.NORMAL_RATE_MAX,
+                "bursty_rate_max":    30.0, # deprecated
+                "suspicious_sigma":   middleware.SUSPICIOUS_SIGMA,
+                "suspicious_burst":   middleware.SUSPICIOUS_BURST,
+                "suspicious_persist": middleware.SUSPICIOUS_PERSIST,
+                "bursty_burst_min":   middleware.BURSTY_BURST_MIN,
+                "bursty_persist_min": middleware.BURSTY_PERSIST_MIN,
             },
             "profiles": {
-                t.value: PROFILES[t]
-                for t in TrafficType
+                "normal": {"capacity": middleware.BUCKET_PROFILES["normal"][0], "refill_rate": middleware.BUCKET_PROFILES["normal"][1]},
+                "bursty_legitimate": {"capacity": middleware.BUCKET_PROFILES["bursty"][0], "refill_rate": middleware.BUCKET_PROFILES["bursty"][1]},
+                "suspicious_abusive": {"capacity": middleware.BUCKET_PROFILES["suspicious"][0], "refill_rate": middleware.BUCKET_PROFILES["suspicious"][1]},
             },
             "note": "Token bucket values are configurable defaults per thesis evaluation phase.",
         }
@@ -194,8 +194,9 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
     async def update_config(config: ConfigUpdate):
         """
         Dynamically applies updated thresholds and token bucket profiles.
-        Validates Constraints 4, 5, 6 before applying.
         """
+        import middleware
+        
         if not (config.suspicious_refill < config.normal_refill < config.bursty_refill):
             return JSONResponse(
                 status_code = 422,
@@ -206,22 +207,13 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
                 status_code = 422,
                 content     = {"error": "Constraint 5 violated: suspicious_capacity < normal_capacity < bursty_capacity"},
             )
-        if not (config.normal_rate_max < config.bursty_rate_max):
-            return JSONResponse(
-                status_code = 422,
-                content     = {"error": "Constraint 6 violated: normal_rate_max < bursty_rate_max"},
-            )
  
-        heuristic_engine.NORMAL_RATE_MAX  = config.normal_rate_max
-        heuristic_engine.BURSTY_RATE_MAX  = config.bursty_rate_max
-        heuristic_engine.SUSPICIOUS_SIGMA = config.suspicious_sigma
+        middleware.NORMAL_RATE_MAX  = config.normal_rate_max
+        middleware.SUSPICIOUS_SIGMA = config.suspicious_sigma
  
-        heuristic_engine.PROFILES[TrafficType.NORMAL]["refill_rate"]             = config.normal_refill
-        heuristic_engine.PROFILES[TrafficType.NORMAL]["capacity"]                = config.normal_capacity
-        heuristic_engine.PROFILES[TrafficType.BURSTY_LEGITIMATE]["refill_rate"]  = config.bursty_refill
-        heuristic_engine.PROFILES[TrafficType.BURSTY_LEGITIMATE]["capacity"]     = config.bursty_capacity
-        heuristic_engine.PROFILES[TrafficType.SUSPICIOUS_ABUSIVE]["refill_rate"] = config.suspicious_refill
-        heuristic_engine.PROFILES[TrafficType.SUSPICIOUS_ABUSIVE]["capacity"]    = config.suspicious_capacity
+        middleware.BUCKET_PROFILES["normal"]     = (config.normal_capacity, config.normal_refill)
+        middleware.BUCKET_PROFILES["bursty"]     = (config.bursty_capacity, config.bursty_refill)
+        middleware.BUCKET_PROFILES["suspicious"] = (config.suspicious_capacity, config.suspicious_refill)
  
         return {
             "status":  "applied",

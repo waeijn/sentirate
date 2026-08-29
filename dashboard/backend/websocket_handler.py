@@ -130,7 +130,7 @@ async def _build_metrics_payload(limiter: AdaptiveRateLimiter) -> dict:
     # ── Classification breakdown ──────────────────────────────────────────
     cc = metrics.pop("class_counts", {})
     classifications = {
-        "normal":     cc.get("normal",     0),
+        "normal":     cc.get("normal", 0) + cc.get("probation", 0),  # probation = unverified normal
         "bursty":     cc.get("bursty",     0),
         "suspicious": cc.get("suspicious", 0),
         "blocked":    cc.get("blocked",    0),
@@ -176,13 +176,13 @@ async def _build_metrics_payload(limiter: AdaptiveRateLimiter) -> dict:
             "total_accepted":  total_accepted,
             "total_rejected":  total_rejected,
             "total_requests":  metrics.get("total_requests", 0),
-            "rar_percent":     round((rar_val if rar_val is not None else 1.0) * 100, 2),
-            "fpr_percent":     round((fpr_val if fpr_val is not None else 0.0) * 100, 2),
-            "fnr_percent":     round((fnr_val if fnr_val is not None else 0.0) * 100, 2),
+            "rar_percent":     round(rar_val * 100, 2) if rar_val is not None else None,
+            "fpr_percent":     round(fpr_val * 100, 2) if fpr_val is not None else None,
+            "fnr_percent":     round(fnr_val * 100, 2) if fnr_val is not None else None,
             "avg_latency_ms":  metrics.get("avg_latency_ms", 0.0),
             "p95_latency_ms":  metrics.get("p95_latency_ms", 0.0),
             "classifications": classifications,
-            "throughput":      0.0,
+            "throughput":      metrics.get("throughput", 0.0),
         },
         "recent_events": recent_events,
     }

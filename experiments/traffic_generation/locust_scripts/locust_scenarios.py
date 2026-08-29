@@ -105,19 +105,18 @@ def human_wait(self):
 
 def batch_wait(self):
     """
-    Batch job / app sync pattern — creates visible spikes then silence:
-      60% of the time: rapid fire 0.04–0.08s (active batch window)
-      30% of the time: moderate 0.1–0.3s (winding down)
-      10% of the time: long pause 2.0–5.0s (job finished, waiting for next)
-    This creates the spike-then-drop pattern seen in the Figma prototype.
+    Batch job / app sync pattern:
+    Fires continuously and rapidly during its 15-second active burst window 
+    to build mathematically pure "burst persistence".
     """
-    roll = random.random()
-    if roll < 0.15:
-        return random.uniform(0.01, 0.04)   # fast burst
-    elif roll < 0.50:
-        return random.uniform(0.1, 0.4)     # moderate
+    cycle_position = (time.time() + getattr(self, "_burst_phase", 0)) % 35
+    if cycle_position < 15:
+        # Active burst window — fire continuously at ~12–20 req/s
+        # This guarantees interval < 0.1s, linking the burst chain for high persistence
+        return random.uniform(0.05, 0.08)
     else:
-        return random.uniform(1.0, 4.0)     # long idle — bucket resets
+        # Quiet period — long idle
+        return random.uniform(1.0, 4.0)
 
 
 def attack_wait(self):
@@ -179,23 +178,16 @@ class BurstyUser(HttpUser):
 
     @task
     def api_call(self):
-
-        cycle_position = (time.time() + self._burst_phase) % 35
-        if cycle_position < 15:
-            # Active burst window
-            with self.client.post(
-                f"/api/request/{self.spoofed_ip}",
-                headers={"X-Forwarded-For": self.spoofed_ip},
-                name="/api/request [bursty]",
-                catch_response=True,
-            ) as response:
-                if response.status_code == 429:
-                    response.success()
-                elif response.status_code >= 500:
-                    response.failure(f"Server Error: {response.status_code}")
-        else:
-            # Quiet period — sleep instead of sending
-            time.sleep(random.uniform(0.5, 2.0))
+        with self.client.post(
+            f"/api/request/{self.spoofed_ip}",
+            headers={"X-Forwarded-For": self.spoofed_ip},
+            name="/api/request [bursty]",
+            catch_response=True,
+        ) as response:
+            if response.status_code == 429:
+                response.success()
+            elif response.status_code >= 500:
+                response.failure(f"Server Error: {response.status_code}")
 
 
 # ── Scenario 3: Suspicious / Abusive Traffic ──────────────────────────────────

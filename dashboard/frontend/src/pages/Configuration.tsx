@@ -183,7 +183,6 @@ function Slider({
   onChange: (v: number) => void;
 }) {
   const pct = ((value - min) / (max - min)) * 100;
-  const display = Number.isInteger(step) ? r0(value) : r1(value);
   return (
     <div style={{ marginBottom: 18 }}>
       <div
@@ -215,16 +214,31 @@ function Slider({
             gap: 4,
           }}
         >
-          <span
+          <input
+            type="number"
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            onChange={(e) => {
+              let val = parseFloat(e.target.value);
+              if (!isNaN(val)) {
+                onChange(val);
+              }
+            }}
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: 15,
               fontWeight: 600,
               color,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              width: "55px",
+              textAlign: "right",
+              padding: 0,
             }}
-          >
-            {display}
-          </span>
+          />
           <span
             style={{
               fontFamily: "var(--font-mono)",
@@ -576,7 +590,7 @@ function CustomProfileCard({
       <Slider
         label="Refill Rate"
         value={values.refill}
-        min={1}
+        min={0}
         max={500}
         step={1}
         unit="tok/s"
@@ -586,9 +600,9 @@ function CustomProfileCard({
       <Slider
         label="Bucket Capacity"
         value={values.cap}
-        min={50}
+        min={0}
         max={1000}
-        step={10}
+        step={1}
         unit="tokens"
         color={color}
         onChange={(v) => onChange({ ...values, cap: v })}
@@ -846,7 +860,7 @@ export function Configuration() {
           <Slider
             label="Refill Rate (r)"
             value={baseRefill}
-            min={1}
+            min={0}
             max={500}
             step={1}
             unit="req/s"
@@ -856,9 +870,9 @@ export function Configuration() {
           <Slider
             label="Bucket Capacity (b)"
             value={baseCap}
-            min={50}
+            min={0}
             max={1000}
-            step={10}
+            step={1}
             unit="tokens"
             color="linear-gradient(90deg,#6366f1,#8b5cf6)"
             onChange={setBaseCap}

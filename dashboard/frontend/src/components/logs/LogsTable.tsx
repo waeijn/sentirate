@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { ClassBadge, ActionBadge } from "../common/Badge";
 import type { LogEntry } from "../../types";
 
@@ -81,13 +81,13 @@ function SigmaBar({ value }: { value: number | null }) {
     );
   }
   const color =
-    value < 0.1
+    value < 0.15
       ? "var(--suspicious)"
       : value < 0.5
         ? "var(--bursty)"
         : "var(--normal)";
   return (
-    <ValueBar value={value} max={2.0} color={color} unit="s" decimals={3} />
+    <ValueBar value={value} max={1.0} color={color} unit="s" decimals={3} />
   );
 }
 
@@ -473,7 +473,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                     <td style={{ padding: "10px 14px" }}>
                       <ValueBar
                         value={entry.requestRate}
-                        max={100}
+                        max={40}
                         color={rateColor}
                         unit="req/s"
                         decimals={1}
@@ -494,7 +494,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                     <td style={{ padding: "10px 14px" }}>
                       <ValueBar
                         value={entry.persistence}
-                        max={60}
+                        max={30}
                         color={persistColor}
                         unit="s"
                         decimals={1}

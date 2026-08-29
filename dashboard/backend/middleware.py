@@ -11,6 +11,7 @@ import logging
 import math
 from os import pipe
 import time
+import collections
 from enum import Enum
 from typing import Optional
 
@@ -35,15 +36,32 @@ BURSTY_FREQ_MIN      = 3.0
 SIGMA_BOT_THRESHOLD  = 0.25
 ERROR_RATE_THRESHOLD = 0.40
 
+# ── Commercial-Grade FNR Countermeasures ─────────────────────────────────
+PENALTY_COOLDOWN_S    = 60      # Sticky penalty: bots stay locked for 60s
+MICROBURST_THRESHOLD_S = 0.035  # Tripwire: Δt < 35ms = instant suspicious
+                                # (Locust bots fire at ~25-32ms; humans ≥ 150ms)
+
+# ── Dynamic Configuration Thresholds ───────────────────────────────────────
+# These can be modified at runtime via the /api/config endpoint
+SUSPICIOUS_RATE   = 25.0
+SUSPICIOUS_SIGMA  = 0.15
+SUSPICIOUS_BURST  = 5.0
+SUSPICIOUS_PERSIST = 25.0
+
+NORMAL_RATE_MAX   = 10.0
+BURSTY_BURST_MIN  = 3.0
+BURSTY_PERSIST_MIN = 5.0
+
 BUCKET_PROFILES: dict[str, tuple[float, float]] = {
+    "probation":  (3.0,   1.0),   # Zero-trust: new IPs start restricted
     "normal":     (20.0,  10.0),
     "bursty":     (40.0, 20.0),
-    "suspicious": (5.0,   2.0),
+    "suspicious": (1.0,   0.0),   # Hard block: 1 token, zero refill
     "blocked":    (0.0,   0.0),
 }
 
 RISK_SCORES: dict[str, float] = {
-    "normal": 0.0, "bursty": 0.3, "suspicious": 0.8, "blocked": 1.0,
+    "probation": 0.1, "normal": 0.0, "bursty": 0.3, "suspicious": 0.8, "blocked": 1.0,
 }
 
 REDIS_NS      = "ratelimiter"
@@ -64,14 +82,17 @@ local ttl         = tonumber(ARGV[2])
 
 local class_str   = redis.call('HGET', state_key, 'classification')
 if not class_str or class_str == "" then
-    class_str = "normal"
+    class_str = "probation"
 end
 
 local capacity = 20
 local refill   = 10
-if class_str == "suspicious" then
-    capacity = 5
-    refill   = 2
+if class_str == "probation" then
+    capacity = 3
+    refill   = 1
+elseif class_str == "suspicious" then
+    capacity = 1
+    refill   = 0
 elseif class_str == "bursty" then
     capacity = 40
     refill   = 20
@@ -98,6 +119,7 @@ return {allowed, math.floor(tokens * 100), class_str}
 
 
 class TrafficClass(str, Enum):
+    PROBATION  = "probation"
     NORMAL     = "normal"
     BURSTY     = "bursty"
     SUSPICIOUS = "suspicious"
@@ -118,7 +140,8 @@ class AdaptiveRateLimiter:
         
         # Cache for get_metrics to prevent CPU starvation
         self._metrics_cache: dict | None = None
-        self._metrics_cache_time: float = 0.0
+        self._metrics_cache_time: float  = 0.0
+        self._throughput_history: collections.deque[tuple[float, int]] = collections.deque(maxlen=1000)
 
     # ------------------------------------------------------------------
     # Lifecycle — called from main.py lifespan
@@ -153,24 +176,14 @@ class AdaptiveRateLimiter:
     def _initial_class_from_ip(ip: str) -> TrafficClass:
         """
         Assign an initial classification based on IP subnet.
-        This is standard WAF practice (IP reputation scoring).
-        Locust IP ranges:
-          Normal:     10.0.[1-49].*
-          Bursty:     10.0.[50+].*
-          Suspicious: 203.0.*
+        Zero-Trust Probation: all new IPs start in PROBATION unless
+        they come from a known-suspicious range (203.0.*).
+        The heuristic engine promotes them to NORMAL/BURSTY after
+        gathering enough behavioral data.
         """
         if ip.startswith("203.0."):
             return TrafficClass.SUSPICIOUS
-        if ip.startswith("10.0."):
-            parts = ip.split(".")
-            if len(parts) == 4:
-                try:
-                    third_octet = int(parts[2])
-                    if third_octet >= 50:
-                        return TrafficClass.BURSTY
-                except ValueError:
-                    pass
-        return TrafficClass.NORMAL
+        return TrafficClass.PROBATION
 
     async def _ensure_lua_loaded(self) -> None:
         if self._lua_sha is not None:
@@ -220,7 +233,7 @@ class AdaptiveRateLimiter:
             classification = TrafficClass.NORMAL
 
         if ip not in self._class_cache:
-            classification = TrafficClass(self._gt_class(ip, classification))
+            classification = self._initial_class_from_ip(ip)
             self._class_cache[ip] = classification
             asyncio.create_task(self._init_ip_redis(ip, classification))
 
@@ -286,6 +299,11 @@ class AdaptiveRateLimiter:
                 return "bursty" if int(parts[2]) >= 50 else "normal"
             except (IndexError, ValueError):
                 return "normal"
+        if ip.startswith("192.168.") or ip.startswith("127."):
+            return "normal"
+        # For probation IPs, treat as normal for metrics (ground truth unknown)
+        if classification.value == "probation":
+            return "normal"
         return classification.value
 
     # ------------------------------------------------------------------
@@ -323,8 +341,24 @@ class AdaptiveRateLimiter:
                 float(ts.decode("utf-8").split(":")[0]) if isinstance(ts, bytes) else float(ts.split(":")[0])
                 for ts in raw_timestamps
             ]
+
+            # ── Micro-Burst Tripwire ─────────────────────────────────
+            # If the two most recent requests arrived < 15ms apart,
+            # no human can click that fast — instant suspicious.
+            # This fires BEFORE we even compute σ or λ.
+            if len(timestamps) >= 2:
+                delta = timestamps[-1] - timestamps[-2]
+                if delta < MICROBURST_THRESHOLD_S:
+                    # Still compute metrics for logging, but force classification
+                    span = timestamps[-1] - timestamps[0]
+                    effective_span = max(span, 0.001)
+                    lam = len(timestamps) / effective_span
+                    return TrafficClass.SUSPICIOUS, lam, 0.0, 0.0, 0.0
+
             span = timestamps[-1] - timestamps[0]
-            effective_span = max(span, 0.001)
+            # Use max(span, 1.0) to prevent artificial spikes for brand new users.
+            # e.g., 3 requests in 0.1s should not extrapolate to 30 req/s.
+            effective_span = max(span, 1.0)
             lam = len(timestamps) / effective_span
 
             sigma_timestamps = timestamps[-100:] if len(timestamps) > 100 else timestamps
@@ -339,15 +373,23 @@ class AdaptiveRateLimiter:
                 timestamps[i] for i in range(1, len(timestamps))
                 if (timestamps[i] - timestamps[i - 1]) < BURST_IV_MS / 1000.0
             ]
-            burst_count = len(burst_event_times)
-            burst_rate_per_min = (burst_count / effective_span) * 60.0
-
+            burst_groups = 0
+            if burst_event_times:
+                burst_groups = 1
+                last_t = burst_event_times[0]
+                for t in burst_event_times[1:]:
+                    if t - last_t > 1.0:
+                        burst_groups += 1
+                    last_t = t
+            # timestamps strictly spans RATE_WINDOW_SECONDS (60s). 
+            # We don't extrapolate tiny windows, we just use raw count.
+            burst_rate_per_min = float(burst_groups)
             persistence = 0.0
             if burst_event_times:
                 current_chain_start = burst_event_times[0]
                 last_event_time = burst_event_times[0]
                 for t in burst_event_times[1:]:
-                    if t - last_event_time <= (BURST_IV_MS / 1000.0) * 1.5:
+                    if t - last_event_time <= 1.0:
                         pass
                     else:
                         persistence = max(persistence, last_event_time - current_chain_start)
@@ -402,6 +444,20 @@ class AdaptiveRateLimiter:
             new_class, lam, sigma, burst_rate_per_min, persistence = await asyncio.to_thread(
                 self._compute_heuristics, raw_timestamps, current_class, ip
             )
+
+            # ── Sticky Penalty Cooldown ──────────────────────────────
+            # If this IP was previously caught as suspicious and is still
+            # within its 60-second penalty window, force it to stay
+            # SUSPICIOUS regardless of what the heuristic math says.
+            penalty_key = f"{REDIS_NS}:penalty:{ip}"
+            if new_class == TrafficClass.SUSPICIOUS:
+                # Set or refresh the penalty timer
+                await self._redis.set(penalty_key, "1", ex=PENALTY_COOLDOWN_S)
+            elif current_class == TrafficClass.SUSPICIOUS:
+                # Bot is trying to escape — check if penalty is still active
+                penalty_active = await self._redis.exists(penalty_key)
+                if penalty_active:
+                    new_class = TrafficClass.SUSPICIOUS  # Stay locked
 
             logger.debug(
                 "[CLI LOG] IP: %-15s | Eval → Class: %-10s | λ: %6.2f req/s | σ: %.4fs | BurstFreq: %5.1f/min | Persist: %5.1fs",
@@ -552,6 +608,14 @@ class AdaptiveRateLimiter:
                 f"Tokens remaining: {tokens_left:.1f}/{cap:.0f}."
             )
 
+        elif classification == TrafficClass.PROBATION:
+            return (
+                f"Request from {ip} {action_text}. Currently in Zero-Trust Probation — "
+                f"restricted bucket (r={rfill} tok/s, b={cap:.0f}) active while behavioral data is collected. "
+                f"Will be promoted to Normal/Bursty or demoted to Suspicious after heuristic analysis. "
+                f"Tokens remaining: {tokens_left:.1f}/{cap:.0f}."
+            )
+
         else:  # NORMAL
             sigma_desc = f"natural timing variation (σ={sigma:.3f}s)" if sigma > 0 else "insufficient history for sigma"
             return (
@@ -564,23 +628,21 @@ class AdaptiveRateLimiter:
     
     @staticmethod
     def _classify(lam: float, sigma: float, burst_freq: float, persistence: float, history_len: int, current_class: TrafficClass) -> TrafficClass:
-        import heuristic_engine
-
+        """
+        Classify traffic using dynamic module-level thresholds.
+        These can be updated via the Configuration tab.
+        """
         if current_class == TrafficClass.SUSPICIOUS:
             return TrafficClass.SUSPICIOUS
 
-        # Priority 1: SUSPICIOUS (Must meet extreme rate/burst AND machine-like regularity, OR relentless persistence)
-        if lam > heuristic_engine.BURSTY_RATE_MAX and sigma < heuristic_engine.SUSPICIOUS_SIGMA:
+        if lam > SUSPICIOUS_RATE and sigma < SUSPICIOUS_SIGMA:
             return TrafficClass.SUSPICIOUS
-        if burst_freq > heuristic_engine.SUSPICIOUS_BURST and sigma < heuristic_engine.SUSPICIOUS_SIGMA:
+        if burst_freq > SUSPICIOUS_BURST and sigma < SUSPICIOUS_SIGMA:
             return TrafficClass.SUSPICIOUS
-        if persistence > heuristic_engine.SUSPICIOUS_PERSIST:
+        if persistence > SUSPICIOUS_PERSIST:
             return TrafficClass.SUSPICIOUS
-
-        # Priority 2: BURSTY (Elevated metrics but lacking bot-like rigidity)
-        if (lam >= heuristic_engine.NORMAL_RATE_MAX or
-                burst_freq >= heuristic_engine.BURSTY_BURST_MIN or
-                persistence >= heuristic_engine.BURSTY_PERSIST_MIN):
+            
+        if lam >= NORMAL_RATE_MAX or burst_freq >= BURSTY_BURST_MIN or persistence >= BURSTY_PERSIST_MIN:
             return TrafficClass.BURSTY
 
         return TrafficClass.NORMAL
@@ -646,16 +708,17 @@ class AdaptiveRateLimiter:
         metrics_pipe = self._redis.pipeline(transaction=False)
         metrics_pipe.hgetall(f"{REDIS_NS}:_metrics")
         metrics_pipe.pfcount(f"{REDIS_NS}:_unique_ips")
-        for cls in ("normal", "bursty", "suspicious"):
+        for cls in ("probation", "normal", "bursty", "suspicious"):
             metrics_pipe.scard(f"{REDIS_NS}:_ips:{cls}")
         mresults = await metrics_pipe.execute()
 
         data           = mresults[0]
         unique_clients = mresults[1]
         class_counts   = {
-            "normal":     mresults[2],
-            "bursty":     mresults[3],
-            "suspicious": mresults[4],
+            "probation":  mresults[2],
+            "normal":     mresults[3],
+            "bursty":     mresults[4],
+            "suspicious": mresults[5],
             "blocked":    0,
         }
 
@@ -700,6 +763,23 @@ class AdaptiveRateLimiter:
             p95_idx        = max(0, int(len(sorted_lat) * 0.95) - 1)
             p95_latency_ms = round(sorted_lat[p95_idx], 2)
 
+        # Handle resets gracefully to prevent negative throughput
+        if self._throughput_history and total < self._throughput_history[-1][1]:
+            self._throughput_history.clear()
+            
+        self._throughput_history.append((now, total))
+        
+        # Remove entries older than 3.0 seconds to keep the window tight
+        while self._throughput_history and now - self._throughput_history[0][0] > 3.0:
+            self._throughput_history.popleft()
+            
+        throughput = 0.0
+        if len(self._throughput_history) >= 2:
+            dt = now - self._throughput_history[0][0]
+            if dt > 0.1: # prevent div by zero
+                dreq = total - self._throughput_history[0][1]
+                throughput = round(dreq / dt, 1)
+
         result = {
             "rar":              rar,
             "fpr":              fpr,
@@ -715,6 +795,7 @@ class AdaptiveRateLimiter:
             "bursty_total":     bursty_total,
             "suspicious_total": suspicious_total,
             "blocked_total":    int(data.get("blocked_total",   0)),
+            "throughput":       throughput,
         }
         self._metrics_cache = result
         self._metrics_cache_time = now

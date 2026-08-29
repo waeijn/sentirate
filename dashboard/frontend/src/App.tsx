@@ -289,7 +289,13 @@ export default function App() {
   const [stats, setStats] = useState<StatCardData[]>(SEED_STATS);
   const [chartData, setChartData] = useState<TrafficPoint[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>(SEED_ALERTS);
-  const [analytics, setAnalytics] = useState(SEED_ANALYTICS);
+  const [analytics, setAnalytics] = useState<{
+    fpr: number | null;
+    fnr: number | null;
+    tpr: number | null;
+    tnr: number | null;
+    accuracy: number | null;
+  }>(SEED_ANALYTICS);
 
   // Logs state
   const [logs, setLogs] = useState<LogEntry[]>(SEED_LOGS);
@@ -353,15 +359,12 @@ export default function App() {
         reqCountRef.current += data.recent_events?.length ?? 0;
 
         // ── Stat cards ──────────────────────────────────────────────────────
-        const total = s.total_accepted + s.total_rejected;
         // Use backend-computed RAR directly — it's calculated from the
         // full request log in FeedbackProvider.get_summary_metrics()
-        const acceptRate =
-          s.rar_percent != null
-            ? s.rar_percent.toFixed(1)
-            : total > 0
-              ? ((s.total_accepted / total) * 100).toFixed(1)
-              : "100.0";
+        let acceptRate = "N/A";
+        if (s.rar_percent != null) {
+          acceptRate = s.rar_percent.toFixed(1);
+        }
 
         setStats([
           {
@@ -397,7 +400,7 @@ export default function App() {
           {
             label: "Request Acceptance Rate",
             value: acceptRate,
-            unit: "%",
+            unit: acceptRate === "N/A" ? "" : "%",
             delta: `${s.total_accepted} allowed`,
             deltaPositive: true,
             icon: "acceptance",
@@ -408,17 +411,15 @@ export default function App() {
         // ── Analytics — use backend computed values directly ─────────────────
         // Backend FeedbackProvider.get_summary_metrics() computes these
         // correctly from the full request log, not from client counts.
-        setAnalytics({
-          fpr: s.fpr_percent ?? 0.0,
-          fnr: s.fnr_percent ?? 0.0,
-          tpr: parseFloat((100 - (s.fnr_percent ?? 0)).toFixed(1)),
-          tnr: parseFloat((100 - (s.fpr_percent ?? 0)).toFixed(1)),
-          accuracy: parseFloat(
-            ((200 - (s.fpr_percent ?? 0) - (s.fnr_percent ?? 0)) / 2).toFixed(
-              1,
-            ),
-          ),
-        });
+        const fpr = s.fpr_percent != null ? s.fpr_percent : null;
+        const fnr = s.fnr_percent != null ? s.fnr_percent : null;
+        const tpr = fnr != null ? parseFloat((100 - fnr).toFixed(1)) : null;
+        const tnr = fpr != null ? parseFloat((100 - fpr).toFixed(1)) : null;
+        const accuracy = (fpr != null && fnr != null)
+          ? parseFloat(((200 - fpr - fnr) / 2).toFixed(1))
+          : null;
+
+        setAnalytics({ fpr, fnr, tpr, tnr, accuracy });
 
         // ── Chart ────────────────────────────────────────────────────────────
         setChartData((prev) =>

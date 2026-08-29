@@ -70,11 +70,11 @@ const ICON_COLORS = {
 interface AccuracyModalProps {
   onClose: () => void;
   analytics?: {
-    fpr: number;
-    fnr: number;
-    tpr: number;
-    tnr: number;
-    accuracy: number;
+    fpr: number | null;
+    fnr: number | null;
+    tpr: number | null;
+    tnr: number | null;
+    accuracy: number | null;
   };
 }
 
@@ -107,11 +107,11 @@ function ClassificationAccuracyModal({
   onClose,
   analytics,
 }: AccuracyModalProps) {
-  const fpr = analytics?.fpr ?? 2.1;
-  const fnr = analytics?.fnr ?? 1.4;
-  const tpr = analytics?.tpr ?? 98.6;
-  const tnr = analytics?.tnr ?? 97.9;
-  const accuracy = analytics?.accuracy ?? 98.2;
+  const fpr = analytics?.fpr;
+  const fnr = analytics?.fnr;
+  const tpr = analytics?.tpr;
+  const tnr = analytics?.tnr;
+  const accuracy = analytics?.accuracy;
 
   return (
     <div
@@ -237,10 +237,10 @@ function ClassificationAccuracyModal({
                 fontFamily: "var(--font-mono)",
               }}
             >
-              {fpr.toFixed(1)}%
+              {fpr != null ? `${fpr.toFixed(1)}%` : "N/A"}
             </span>
           </div>
-          <AnalyticsBar value={fpr * 10} color="var(--bursty)" />
+          <AnalyticsBar value={fpr != null ? fpr * 10 : 0} color="var(--bursty)" />
           <p
             style={{
               fontSize: 11,
@@ -249,7 +249,7 @@ function ClassificationAccuracyModal({
               lineHeight: 1.6,
             }}
           >
-            Out of all legitimate traffic, {fpr.toFixed(1)}% was incorrectly
+            Out of all legitimate traffic, {fpr != null ? `${fpr.toFixed(1)}%` : "N/A"} was incorrectly
             flagged as suspicious.
           </p>
         </div>
@@ -295,10 +295,10 @@ function ClassificationAccuracyModal({
                 fontFamily: "var(--font-mono)",
               }}
             >
-              {fnr.toFixed(1)}%
+              {fnr != null ? `${fnr.toFixed(1)}%` : "N/A"}
             </span>
           </div>
-          <AnalyticsBar value={fnr * 10} color="var(--suspicious)" />
+          <AnalyticsBar value={fnr != null ? fnr * 10 : 0} color="var(--suspicious)" />
           <p
             style={{
               fontSize: 11,
@@ -307,7 +307,7 @@ function ClassificationAccuracyModal({
               lineHeight: 1.6,
             }}
           >
-            Out of all malicious traffic, {fnr.toFixed(1)}% slipped through
+            Out of all malicious traffic, {fnr != null ? `${fnr.toFixed(1)}%` : "N/A"} slipped through
             without being detected.
           </p>
         </div>
@@ -323,17 +323,17 @@ function ClassificationAccuracyModal({
           {[
             {
               label: "True Positive\nRate",
-              value: `${tpr.toFixed(1)}%`,
+              value: tpr != null ? `${tpr.toFixed(1)}%` : "N/A",
               color: "var(--normal)",
             },
             {
               label: "True Negative\nRate",
-              value: `${tnr.toFixed(1)}%`,
+              value: tnr != null ? `${tnr.toFixed(1)}%` : "N/A",
               color: "var(--normal)",
             },
             {
               label: "Overall\nAccuracy",
-              value: `${accuracy.toFixed(1)}%`,
+              value: accuracy != null ? `${accuracy.toFixed(1)}%` : "N/A",
               color: "var(--normal)",
             },
           ].map((item) => (
