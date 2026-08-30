@@ -53,8 +53,8 @@ export function ClassBadge({ type }: { type: Classification }) {
       style={{
         background: s.bg,
         color: s.color,
-        borderRadius: 999,
-        padding: "3px 12px",
+        borderRadius: "var(--radius-sm)",
+        padding: "4px 12px",
         fontSize: 11,
         fontWeight: 600,
         fontFamily: "var(--font-display)",
@@ -75,8 +75,8 @@ export function ActionBadge({ type }: { type: Action }) {
       style={{
         background: s.bg,
         color: s.color,
-        borderRadius: 999,
-        padding: "3px 12px",
+        borderRadius: "var(--radius-sm)",
+        padding: "4px 12px",
         fontSize: 11,
         fontWeight: 600,
         fontFamily: "var(--font-display)",

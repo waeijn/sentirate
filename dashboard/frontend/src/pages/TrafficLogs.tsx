@@ -18,24 +18,25 @@ export function TrafficLogs({ entries }: TrafficLogsProps) {
           flex: 1,
           minWidth: 0,
           overflowY: "auto",
-          padding: "32px",
+          padding: "40px",
           display: "flex",
           flexDirection: "column",
-          gap: 24,
+          gap: 32,
         }}
       >
         <div>
           <h1
             style={{
-              fontSize: 26,
+              fontSize: 28,
               fontWeight: 700,
+              letterSpacing: -0.5,
               color: "var(--text)",
-              marginBottom: 6,
+              marginBottom: 8,
             }}
           >
             Traffic Logs &amp; Explainability
           </h1>
-          <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          <p style={{ fontSize: 14, color: "var(--text-muted)" }}>
             Inspect individual requests and understand why enforcement actions
             were taken
           </p>

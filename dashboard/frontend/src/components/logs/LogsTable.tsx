@@ -31,9 +31,9 @@ function ValueBar({
       <div
         style={{
           flex: 1,
-          height: 4,
+          height: 5,
           background: "var(--border)",
-          borderRadius: 2,
+          borderRadius: 3,
           overflow: "hidden",
         }}
       >
@@ -42,7 +42,7 @@ function ValueBar({
             height: "100%",
             width: `${pct}%`,
             background: color,
-            borderRadius: 2,
+            borderRadius: 3,
             transition: "width 0.3s",
           }}
         />
@@ -169,10 +169,12 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
             display: "flex",
             alignItems: "center",
             gap: 8,
-            background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-sm)",
-            padding: "8px 14px",
+            background: "var(--glass-bg)",
+            backdropFilter: "var(--glass-blur)",
+            WebkitBackdropFilter: "var(--glass-blur)",
+            border: "1px solid var(--glass-border)",
+            borderRadius: 999,
+            padding: "10px 18px",
             flex: 1,
             maxWidth: 320,
           }}
@@ -213,7 +215,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
             alignItems: "center",
             gap: 7,
             padding: "8px 16px",
-            borderRadius: "var(--radius-sm)",
+            borderRadius: 999,
             border: `1px solid ${filtersOpen ? "var(--text)" : "var(--border)"}`,
             background: filtersOpen ? "var(--text)" : "transparent",
             color: filtersOpen ? "var(--bg)" : "var(--text-muted)",
@@ -258,9 +260,12 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
       {filtersOpen && (
         <div
           style={{
-            background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-sm)",
+            background: "var(--glass-bg)",
+            backdropFilter: "var(--glass-blur)",
+            WebkitBackdropFilter: "var(--glass-blur)",
+            border: "1px solid var(--glass-border)",
+            borderRadius: "var(--radius)",
+            boxShadow: "var(--shadow-md)",
             padding: "16px 20px",
             display: "flex",
             gap: 32,
@@ -347,9 +352,12 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
       {/* ΓöÇΓöÇ Table ΓöÇΓöÇ */}
       <div
         style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
+          background: "var(--glass-bg)",
+          backdropFilter: "var(--glass-blur)",
+          WebkitBackdropFilter: "var(--glass-blur)",
+          border: "1px solid var(--glass-border)",
           borderRadius: "var(--radius)",
+          boxShadow: "var(--shadow-md)",
           overflow: "hidden",
         }}
       >
@@ -363,7 +371,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                   <th
                     key={h.label}
                     style={{
-                      padding: "11px 14px",
+                      padding: "14px 16px",
                       textAlign: h.centered ? "center" : "left",
                       fontSize: 11,
                       fontWeight: 600,
@@ -371,7 +379,9 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                       textTransform: "uppercase",
                       letterSpacing: 0.8,
                       whiteSpace: "nowrap",
-                      background: "var(--bg-elevated)",
+                      background: "var(--glass-bg)",
+                      backdropFilter: "var(--glass-blur)",
+                      WebkitBackdropFilter: "var(--glass-blur)",
                       position: "sticky",
                       top: 0,
                       zIndex: 1,
@@ -400,7 +410,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                   </td>
                 </tr>
               )}
-              {filtered.map((entry) => {
+              {filtered.map((entry, index) => {
                 const isSelected = selected?.id === entry.id;
                 const rateColor =
                   entry.requestRate > 30
@@ -426,7 +436,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                     key={entry.id}
                     onClick={() => toggle(entry)}
                     style={{
-                      borderBottom: "1px solid var(--border)22",
+                      borderBottom: "1px solid var(--border)",
                       background: isSelected
                         ? "var(--bg-hover)"
                         : "transparent",
@@ -449,7 +459,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                   >
                     <td
                       style={{
-                        padding: "10px 14px",
+                        padding: "16px 20px",
                         fontSize: 12,
                         fontFamily: "var(--font-mono)",
                         color: "var(--text-dim)",
@@ -460,7 +470,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                     </td>
                     <td
                       style={{
-                        padding: "10px 14px",
+                        padding: "16px 20px",
                         fontSize: 13,
                         fontFamily: "var(--font-mono)",
                         color: "var(--text)",
@@ -470,7 +480,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                     >
                       {entry.clientIp}
                     </td>
-                    <td style={{ padding: "10px 14px" }}>
+                    <td style={{ padding: "16px 20px" }}>
                       <ValueBar
                         value={entry.requestRate}
                         max={40}
@@ -479,10 +489,10 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                         decimals={1}
                       />
                     </td>
-                    <td style={{ padding: "10px 14px" }}>
+                    <td style={{ padding: "16px 20px" }}>
                       <SigmaBar value={entry.sigma} />
                     </td>
-                    <td style={{ padding: "10px 14px" }}>
+                    <td style={{ padding: "16px 20px" }}>
                       <ValueBar
                         value={entry.burstFreq}
                         max={10}
@@ -491,7 +501,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                         decimals={0}
                       />
                     </td>
-                    <td style={{ padding: "10px 14px" }}>
+                    <td style={{ padding: "16px 20px" }}>
                       <ValueBar
                         value={entry.persistence}
                         max={30}
@@ -500,13 +510,13 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                         decimals={1}
                       />
                     </td>
-                    <td style={{ padding: "10px 14px" }}>
+                    <td style={{ padding: "16px 20px" }}>
                       <ClassBadge type={entry.classification} />
                     </td>
-                    <td style={{ padding: "10px 14px" }}>
+                    <td style={{ padding: "16px 20px" }}>
                       <ActionBadge type={entry.action} />
                     </td>
-                    <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                    <td style={{ padding: "16px 20px", textAlign: "center" }}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -557,7 +567,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
         {/* Footer */}
         <div
           style={{
-            padding: "10px 16px",
+            padding: "12px 20px",
             borderTop: "1px solid var(--border)",
             fontSize: 12,
             color: "var(--text-muted)",

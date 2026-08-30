@@ -25,25 +25,26 @@ export function Monitoring({
   return (
     <div
       style={{
-        padding: "32px",
+        padding: "40px",
         display: "flex",
         flexDirection: "column",
-        gap: 24,
+        gap: 32,
       }}
     >
       {/* Page header */}
       <div>
         <h1
           style={{
-            fontSize: 26,
+            fontSize: 28,
             fontWeight: 700,
             color: "var(--text)",
-            marginBottom: 6,
+            marginBottom: 8,
+            letterSpacing: -0.5,
           }}
         >
           Real-Time Monitoring
         </h1>
-        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+        <p style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>
           Live overview of your API traffic patterns and system health
         </p>
       </div>
@@ -53,7 +54,7 @@ export function Monitoring({
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 16,
+          gap: 20,
         }}
       >
         {stats.map((s, i) => (
@@ -68,7 +69,7 @@ export function Monitoring({
 
       {/* Chart + Alerts */}
       <div
-        style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16 }}
+        style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20 }}
       >
         <TrafficChart data={chartData} />
         <RecentAlerts alerts={alerts} />

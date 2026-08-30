@@ -11,9 +11,9 @@ import type { TrafficPoint } from "../../types";
 
 // ── Figma-exact colors ────────────────────────────────────────────────────
 const COLORS = {
-  normal: "#4ade80",
-  bursty: "#fbbf24",
-  suspicious: "#f87171",
+  normal: "#30D158",
+  bursty: "#FF9F0A",
+  suspicious: "#FF453A",
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -105,10 +105,13 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
   return (
     <div
       style={{
-        background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
+        background: "var(--glass-bg)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        border: "1px solid var(--glass-border)",
         borderRadius: "var(--radius)",
-        padding: "24px",
+        boxShadow: "var(--shadow-md)",
+        padding: 24,
       }}
     >
       {/* Header row — title left, legend right (matches Figma) */}
@@ -123,7 +126,7 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
         <div>
           <h2
             style={{
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: 600,
               color: "var(--text)",
               marginBottom: 4,
@@ -228,6 +231,7 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
               fill="url(#gradNormal)"
               dot={false}
               activeDot={{ r: 4, strokeWidth: 0 }}
+              isAnimationActive={false}
             />
             <Area
               type="monotone"
@@ -237,6 +241,7 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
               fill="url(#gradBursty)"
               dot={false}
               activeDot={{ r: 4, strokeWidth: 0 }}
+              isAnimationActive={false}
             />
             <Area
               type="monotone"
@@ -246,6 +251,7 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
               fill="url(#gradSuspicious)"
               dot={false}
               activeDot={{ r: 4, strokeWidth: 0 }}
+              isAnimationActive={false}
             />
           </AreaChart>
         </ResponsiveContainer>

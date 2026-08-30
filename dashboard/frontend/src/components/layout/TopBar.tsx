@@ -17,14 +17,16 @@ export function TopBar({
     <header
       style={{
         height: 52,
-        background: "var(--bg)",
-        borderBottom: "1px solid var(--border)",
+        background: "var(--glass-bg)",
+        borderBottom: "1px solid var(--glass-border)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 24px",
         flexShrink: 0,
-        backdropFilter: "blur(8px)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        zIndex: 5,
       }}
     >
       {/* Title */}

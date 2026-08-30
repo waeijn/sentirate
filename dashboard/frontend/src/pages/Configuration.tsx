@@ -207,8 +207,8 @@ function Slider({
           style={{
             background: "var(--bg-hover)",
             border: "1px solid var(--border-light)",
-            borderRadius: 6,
-            padding: "3px 10px",
+            borderRadius: "var(--radius-sm)",
+            padding: "4px 12px",
             display: "flex",
             alignItems: "center",
             gap: 4,
@@ -255,7 +255,7 @@ function Slider({
           style={{
             position: "absolute",
             inset: 0,
-            borderRadius: 3,
+            borderRadius: 4,
             background: "var(--bg-hover)",
             border: "1px solid var(--border)",
           }}
@@ -267,7 +267,7 @@ function Slider({
             top: 0,
             bottom: 0,
             width: `${pct}%`,
-            borderRadius: 3,
+            borderRadius: 4,
             background: color,
             transition: "width 0.05s",
           }}
@@ -343,7 +343,7 @@ function CardHeader({
         style={{
           width: 30,
           height: 30,
-          borderRadius: 7,
+          borderRadius: "var(--radius-sm)",
           background: dimColor,
           display: "flex",
           alignItems: "center",
@@ -509,11 +509,13 @@ function ProfileCard({
       style={{
         flex: 1,
         minWidth: 0,
-        background: "var(--bg-elevated)",
-        border: "1px solid var(--border)",
-        borderTop: `2px solid ${color}`,
+        background: "var(--glass-bg)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        border: "1px solid var(--glass-border)",
+        borderLeft: `3px solid ${color}`,
         borderRadius: "var(--radius)",
-        padding: "16px 14px",
+        padding: "20px 18px",
       }}
     >
       <CardHeader
@@ -572,11 +574,13 @@ function CustomProfileCard({
       style={{
         flex: 1,
         minWidth: 0,
-        background: "var(--bg-elevated)",
-        border: "1px solid var(--border)",
-        borderTop: `2px solid ${color}`,
+        background: "var(--glass-bg)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        border: "1px solid var(--glass-border)",
+        borderLeft: `3px solid ${color}`,
         borderRadius: "var(--radius)",
-        padding: "16px 14px",
+        padding: "20px 18px",
       }}
     >
       <CardHeader
@@ -631,19 +635,23 @@ function Panel({
 }) {
   return (
     <div
+      className="glass-panel"
       style={{
-        background: "var(--bg)",
-        border: "1px solid var(--border)",
+        background: "var(--glass-bg)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        border: "1px solid var(--glass-border)",
         borderRadius: "var(--radius)",
-        marginBottom: 16,
+        boxShadow: "var(--shadow-md)",
+        marginBottom: 0,
         overflow: "hidden",
       }}
     >
       <div
         style={{
-          padding: "14px 24px",
+          padding: "18px 28px",
           borderBottom: "1px solid var(--border)",
-          background: "var(--bg)",
+          background: "transparent",
           display: "flex",
           alignItems: "center",
           gap: 10,
@@ -653,7 +661,7 @@ function Panel({
           style={{
             width: 28,
             height: 28,
-            borderRadius: 6,
+            borderRadius: "var(--radius-sm)",
             background: iconBg,
             display: "flex",
             alignItems: "center",
@@ -668,7 +676,7 @@ function Panel({
           <div
             style={{
               fontFamily: "var(--font-display)",
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: 600,
               color: "var(--text)",
             }}
@@ -678,7 +686,7 @@ function Panel({
           <div
             style={{
               fontFamily: "var(--font-mono)",
-              fontSize: 11,
+              fontSize: 12,
               color: "var(--text-muted)",
             }}
           >
@@ -686,7 +694,7 @@ function Panel({
           </div>
         </div>
       </div>
-      <div style={{ padding: "24px 24px 16px" }}>{children}</div>
+      <div style={{ padding: "28px 28px 20px" }}>{children}</div>
     </div>
   );
 }
@@ -835,7 +843,14 @@ export function Configuration() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: "28px 32px" }}>
+    <div
+      style={{
+        padding: "40px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 32,
+      }}
+    >
       {/* Token Bucket panel — hidden in custom mode */}
       {preset.key !== "custom" && (
         <Panel
@@ -984,7 +999,7 @@ export function Configuration() {
                 <span
                   style={{
                     fontFamily: "var(--font-display)",
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: 500,
                     color: active ? p.accentColor : "var(--text-dim)",
                   }}
@@ -998,15 +1013,19 @@ export function Configuration() {
 
         {/* Active preset description banner — pure dark bg, only colored left border */}
         <div
+          className="glass-panel"
           style={{
             display: "flex",
             gap: 12,
-            padding: "12px 14px",
+            padding: "14px 18px",
             marginBottom: 20,
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
+            background: "var(--glass-bg)",
+            backdropFilter: "var(--glass-blur)",
+            WebkitBackdropFilter: "var(--glass-blur)",
+            border: "1px solid var(--glass-border)",
             borderLeft: `3px solid ${accentColor}`,
             borderRadius: "var(--radius-sm)",
+            boxShadow: "var(--shadow-md)",
           }}
         >
           <span style={{ fontSize: 18, marginTop: 1, color: accentColor }}>
@@ -1279,7 +1298,7 @@ export function Configuration() {
                     background: "var(--bg-elevated)",
                     border: "1px solid var(--border)",
                     borderRadius: "var(--radius-sm)",
-                    padding: "7px 12px",
+                    padding: "9px 14px",
                     color: "var(--text)",
                     fontSize: 13,
                     outline: "none",
@@ -1328,10 +1347,14 @@ export function Configuration() {
       {/* Recently Saved profiles */}
       {preset.key === "custom" && savedProfiles.length > 0 && (
         <div
+          className="glass-panel"
           style={{
-            background: "var(--bg)",
-            border: "1px solid var(--border)",
+            background: "var(--glass-bg)",
+            backdropFilter: "var(--glass-blur)",
+            WebkitBackdropFilter: "var(--glass-blur)",
+            border: "1px solid var(--glass-border)",
             borderRadius: "var(--radius)",
+            boxShadow: "var(--shadow-md)",
             marginBottom: 16,
             overflow: "hidden",
           }}
@@ -1345,7 +1368,7 @@ export function Configuration() {
               gap: 8,
             }}
           >
-            <span style={{ color: "#22c55e", fontSize: 13 }}>✓</span>
+            <span style={{ color: "var(--normal)", fontSize: 13 }}>✓</span>
             <span
               style={{
                 fontFamily: "var(--font-mono)",
@@ -1376,9 +1399,9 @@ export function Configuration() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: "10px 14px",
-                  background: "var(--bg-elevated)",
-                  border: "1px solid var(--border)",
+                  padding: "12px 16px",
+                  background: "var(--glass-bg)",
+                  border: "1px solid var(--glass-border)",
                   borderRadius: "var(--radius-sm)",
                   cursor: "pointer",
                   transition: "border-color 0.15s",
@@ -1462,14 +1485,18 @@ export function Configuration() {
 
       {/* Action bar */}
       <div
+        className="glass-panel"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 12,
           padding: "14px 20px",
-          background: "var(--bg)",
-          border: "1px solid var(--border)",
+          background: "var(--glass-bg)",
+          backdropFilter: "var(--glass-blur)",
+          WebkitBackdropFilter: "var(--glass-blur)",
+          border: "1px solid var(--glass-border)",
           borderRadius: "var(--radius)",
+          boxShadow: "var(--shadow-md)",
         }}
       >
         <span
@@ -1551,7 +1578,7 @@ export function Configuration() {
             fontFamily: "var(--font-mono)",
             fontSize: 12,
             fontWeight: 500,
-            padding: "7px 20px",
+            padding: "8px 24px",
             borderRadius: "var(--radius-sm)",
             border: "none",
             background:

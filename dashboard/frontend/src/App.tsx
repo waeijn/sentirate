@@ -339,6 +339,9 @@ export default function App() {
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
 
+    let lastRenderTime = 0;
+    let pendingEvents: LiveEvent[] = [];
+
     socket.on(
       "metrics_update",
       (data: {
@@ -346,8 +349,18 @@ export default function App() {
         summary: SystemSummary;
         recent_events: LiveEvent[];
       }) => {
-        const s = data.summary;
+        pendingEvents.push(...(data.recent_events || []));
+        
         const now = Date.now();
+        if (now - lastRenderTime < 2000) {
+          return;
+        }
+        
+        lastRenderTime = now;
+        const eventsToProcess = pendingEvents;
+        pendingEvents = [];
+
+        const s = data.summary;
         const currentTotal = s.total_accepted + s.total_rejected;
         const elapsed = (now - prevTimeRef.current) / 1000;
         const rps =
@@ -356,7 +369,7 @@ export default function App() {
             : 0;
         prevTotalRef.current = currentTotal;
         prevTimeRef.current = now;
-        reqCountRef.current += data.recent_events?.length ?? 0;
+        reqCountRef.current += eventsToProcess.length;
 
         // ── Stat cards ──────────────────────────────────────────────────────
         // Use backend-computed RAR directly — it's calculated from the
@@ -409,8 +422,6 @@ export default function App() {
         ]);
 
         // ── Analytics — use backend computed values directly ─────────────────
-        // Backend FeedbackProvider.get_summary_metrics() computes these
-        // correctly from the full request log, not from client counts.
         const fpr = s.fpr_percent != null ? s.fpr_percent : null;
         const fnr = s.fnr_percent != null ? s.fnr_percent : null;
         const tpr = fnr != null ? parseFloat((100 - fnr).toFixed(1)) : null;
@@ -435,8 +446,8 @@ export default function App() {
         );
 
         // ── Logs + Alerts ────────────────────────────────────────────────────
-        if (data.recent_events?.length > 0) {
-          const newEntries: LogEntry[] = data.recent_events.map((e) => ({
+        if (eventsToProcess.length > 0) {
+          const newEntries: LogEntry[] = eventsToProcess.map((e) => ({
             id: Math.random().toString(36).slice(2),
             timestamp: new Date().toLocaleString(),
             clientIp: e.client_id,
@@ -479,7 +490,7 @@ export default function App() {
               .slice(0, 300);
           });
 
-          const newAlerts = data.recent_events
+          const newAlerts = eventsToProcess
             .filter(
               (e, i, arr) =>
                 // deduplicate — one alert per unique client per update cycle

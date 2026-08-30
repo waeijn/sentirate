@@ -40,10 +40,13 @@ export function RecentAlerts({ alerts }: RecentAlertsProps) {
   return (
     <div
       style={{
-        background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
+        background: "var(--glass-bg)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        border: "1px solid var(--glass-border)",
         borderRadius: "var(--radius)",
-        padding: "24px",
+        boxShadow: "var(--shadow-md)",
+        padding: 20,
         display: "flex",
         flexDirection: "column",
         gap: 0,
@@ -58,7 +61,7 @@ export function RecentAlerts({ alerts }: RecentAlertsProps) {
           marginBottom: 20,
         }}
       >
-        <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>
+        <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>
           Recent Alerts
         </h2>
         <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
@@ -95,15 +98,21 @@ export function RecentAlerts({ alerts }: RecentAlertsProps) {
           return (
             <div
               key={alert.id}
-              className="fade-in"
               style={{
                 background: s.bg,
                 border: `1px solid ${s.border}`,
                 borderRadius: "var(--radius-sm)",
-                padding: "10px 12px",
+                padding: "12px",
                 display: "flex",
                 gap: 10,
                 alignItems: "flex-start",
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background = s.bg;
               }}
             >
               <span

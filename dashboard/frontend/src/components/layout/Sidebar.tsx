@@ -193,9 +193,9 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 justifyContent: collapsed ? "center" : "flex-start",
                 borderRadius: "var(--radius-sm)",
                 border: "none",
-                background: isActive ? "rgba(255,255,255,0.93)" : "transparent",
-                color: isActive ? "#0f0f0f" : "var(--text-muted)",
-                fontWeight: isActive ? 600 : 400,
+                background: isActive ? "var(--bg-hover)" : "transparent",
+                color: isActive ? "var(--text)" : "var(--text-muted)",
+                fontWeight: isActive ? 600 : 500,
                 fontSize: 13,
                 cursor: "pointer",
                 transition: "all 0.15s ease",
@@ -205,7 +205,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
               onMouseEnter={(e) => {
                 if (!isActive) {
                   (e.currentTarget as HTMLElement).style.background =
-                    "rgba(255,255,255,0.07)";
+                    "var(--bg-hover)";
                   (e.currentTarget as HTMLElement).style.color = "var(--text)";
                 }
               }}

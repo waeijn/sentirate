@@ -57,12 +57,18 @@ const ICONS = {
   ),
 };
 
-// ── Figma-matching icon colors ─────────────────────────────────────────────
 const ICON_COLORS = {
-  throughput: "#6366f1",
-  latency: "#8b5cf6",
-  threats: "#f87171",
-  acceptance: "#4ade80",
+  throughput: "var(--accent)",
+  latency: "var(--accent-2)",
+  threats: "var(--suspicious)",
+  acceptance: "var(--normal)",
+};
+
+const ICON_BGS = {
+  throughput: "var(--accent-dim)",
+  latency: "rgba(88, 86, 214, 0.12)", // accent-2 doesn't have a -dim variable, hardcode rgba
+  threats: "var(--suspicious-dim)",
+  acceptance: "var(--normal-dim)",
 };
 
 // ─── Classification Accuracy Modal ────────────────────────────────────────
@@ -116,24 +122,27 @@ function ClassificationAccuracyModal({
   return (
     <div
       onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 200,
-        background: "rgba(0,0,0,0.65)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 200,
+          background: "rgba(0,0,0,0.5)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         className="fade-in"
         style={{
-          background: "#1c1c24",
-          border: "1px solid #2e2e3e",
-          borderRadius: 14,
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          backdropFilter: "var(--glass-blur)",
+          WebkitBackdropFilter: "var(--glass-blur)",
           padding: 28,
           width: 440,
           maxWidth: "92vw",
@@ -199,7 +208,7 @@ function ClassificationAccuracyModal({
         {/* FPR */}
         <div
           style={{
-            background: "#252530",
+            background: "var(--bg-hover)",
             borderRadius: 10,
             padding: "16px 18px",
             marginBottom: 12,
@@ -257,7 +266,7 @@ function ClassificationAccuracyModal({
         {/* FNR */}
         <div
           style={{
-            background: "#252530",
+            background: "var(--bg-hover)",
             borderRadius: 10,
             padding: "16px 18px",
             marginBottom: 16,
@@ -340,8 +349,8 @@ function ClassificationAccuracyModal({
             <div
               key={item.label}
               style={{
-                background: "#252530",
-                border: "1px solid #2e2e3e",
+                background: "var(--bg-hover)",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 padding: "12px 14px",
                 textAlign: "center",
@@ -400,12 +409,14 @@ export function StatCard({
       )}
 
       <div
-        className="fade-in"
         style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
+          background: "var(--glass-bg)",
+          backdropFilter: "var(--glass-blur)",
+          WebkitBackdropFilter: "var(--glass-blur)",
+          border: "1px solid var(--glass-border)",
           borderRadius: "var(--radius)",
-          padding: "20px 24px",
+          boxShadow: "var(--shadow-md)",
+          padding: 24,
           display: "flex",
           flexDirection: "column",
           gap: 12,
@@ -418,20 +429,9 @@ export function StatCard({
             "var(--border-light)";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+          (e.currentTarget as HTMLElement).style.borderColor = "var(--glass-border)";
         }}
       >
-        {/* Subtle top accent — very low opacity so it doesn't tint the card */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 1,
-            background: `${iconColor}66`,
-          }}
-        />
 
         <div
           style={{
@@ -445,17 +445,18 @@ export function StatCard({
               fontSize: 12,
               color: "var(--text-muted)",
               fontWeight: 500,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
             }}
           >
             {data.label}
           </span>
           <div
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 8,
-              background: `${iconColor}14`,
-              border: `1px solid ${iconColor}28`,
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              background: ICON_BGS[data.icon as keyof typeof ICON_BGS],
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

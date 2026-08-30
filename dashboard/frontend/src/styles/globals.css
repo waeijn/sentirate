@@ -1,74 +1,85 @@
-@import url("https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 
-/* ── Dark mode (default) — matches Figma prototype ───────────────────────── */
+/* ── Dark mode (default) — Apple HIG inspired ────────────────────────────── */
 :root {
-  --bg: #09090b;
-  --bg-elevated: #0f0f0f;
-  --bg-panel: #0f0f0f;
-  --bg-hover: #161616;
-  --border: #1e1e1e;
-  --border-light: #262626;
+  --bg: #1C1C1E;
+  --bg-elevated: #2C2C2E;
+  --bg-panel: #2C2C2E;
+  --bg-hover: #3A3A3C;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.12);
 
-  --normal: #4ade80;
-  --normal-dim: #4ade800e;
-  --normal-glow: #4ade8018;
-  --bursty: #fbbf24;
-  --bursty-dim: #fbbf240e;
-  --bursty-glow: #fbbf2418;
-  --suspicious: #f87171;
-  --suspicious-dim: #f871710e;
-  --suspicious-glow: #f8717118;
+  --normal: #30D158;
+  --normal-dim: rgba(48, 209, 88, 0.10);
+  --normal-glow: rgba(48, 209, 88, 0.15);
+  --bursty: #FF9F0A;
+  --bursty-dim: rgba(255, 159, 10, 0.10);
+  --bursty-glow: rgba(255, 159, 10, 0.15);
+  --suspicious: #FF453A;
+  --suspicious-dim: rgba(255, 69, 58, 0.10);
+  --suspicious-glow: rgba(255, 69, 58, 0.15);
 
-  --accent: #8b5cf6;
-  --accent-2: #6366f1;
-  --accent-dim: #8b5cf614;
-  --accent-grad: linear-gradient(135deg, #6366f1, #8b5cf6);
+  --accent: #0A84FF;
+  --accent-2: #5E5CE6;
+  --accent-dim: rgba(10, 132, 255, 0.12);
+  --accent-grad: linear-gradient(135deg, #5E5CE6, #0A84FF);
 
-  --text: #e4e8f5;
-  --text-muted: #4a4a5a;
-  --text-dim: #7a7a8a;
+  --text: #F5F5F7;
+  --text-muted: #8E8E93;
+  --text-dim: #636366;
 
-  --font-display: "Sora", sans-serif;
-  --font-mono: "DM Mono", monospace;
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", monospace;
 
-  --radius: 12px;
-  --radius-sm: 7px;
+  --radius: 20px;
+  --radius-sm: 12px;
   --sidebar-w: 220px;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
+  /* Dark mode: no shadows, use glass instead */
+  --shadow-sm: none;
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  /* Glassmorphism tokens */
+  --glass-bg: rgba(44, 44, 46, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: blur(24px) saturate(180%);
 }
 
-/* ── Light mode ───────────────────────────────────────────────────────────── */
+/* ── Light mode — Apple HIG inspired ─────────────────────────────────────── */
 :root.light {
-  --bg: #f8f8f8;
-  --bg-elevated: #ffffff;
-  --bg-panel: #ffffff;
-  --bg-hover: #f0f0f0;
-  --border: #e2e2e2;
-  --border-light: #d0d0d0;
+  --bg: #F2F2F7;
+  --bg-elevated: #FFFFFF;
+  --bg-panel: #FFFFFF;
+  --bg-hover: #E5E5EA;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-light: rgba(0, 0, 0, 0.12);
 
-  --normal: #16a34a;
-  --normal-dim: #16a34a14;
-  --normal-glow: #16a34a20;
-  --bursty: #d97706;
-  --bursty-dim: #d9770614;
-  --bursty-glow: #d9770620;
-  --suspicious: #dc2626;
-  --suspicious-dim: #dc262614;
-  --suspicious-glow: #dc262620;
+  --normal: #34C759;
+  --normal-dim: rgba(52, 199, 89, 0.12);
+  --normal-glow: rgba(52, 199, 89, 0.15);
+  --bursty: #FF9500;
+  --bursty-dim: rgba(255, 149, 0, 0.12);
+  --bursty-glow: rgba(255, 149, 0, 0.15);
+  --suspicious: #FF3B30;
+  --suspicious-dim: rgba(255, 59, 48, 0.12);
+  --suspicious-glow: rgba(255, 59, 48, 0.15);
 
-  --accent: #7c3aed;
-  --accent-2: #4f46e5;
-  --accent-dim: #7c3aed14;
-  --accent-grad: linear-gradient(135deg, #4f46e5, #7c3aed);
+  --accent: #007AFF;
+  --accent-2: #5856D6;
+  --accent-dim: rgba(0, 122, 255, 0.12);
+  --accent-grad: linear-gradient(135deg, #5856D6, #007AFF);
 
-  --text: #111111;
-  --text-muted: #888888;
-  --text-dim: #555555;
+  --text: #000000;
+  --text-muted: #6E6E73;
+  --text-dim: #3A3A3C;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  /* Light mode: delicate multi-layered ambient shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.02), 0 10px 24px rgba(0, 0, 0, 0.06);
+
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-blur: blur(24px) saturate(180%);
 }
 
 /* ── Reset ────────────────────────────────────────────────────────────────── */
@@ -90,30 +101,47 @@ body,
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01", "tnum";
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: "opsz" 20;
   transition:
-    background 0.25s ease,
-    color 0.25s ease;
+    background 0.3s ease,
+    color 0.3s ease;
+}
+
+/* ── Glass panel utility ─────────────────────────────────────────────────── */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+
+/* In light mode, glass panels become opaque white with shadow */
+:root.light .glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
+  background: var(--text-dim);
+  border-radius: 3px;
+  opacity: 0.5;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-light);
-}
-
-/* ── Grid background — disabled to match Figma (no grid) ─────────────────── */
-.grid-bg {
-  background-image: none;
+  background: var(--text-muted);
 }
 
 /* ── Animations ───────────────────────────────────────────────────────────── */
@@ -124,7 +152,7 @@ body,
     box-shadow: 0 0 0 0 currentColor;
   }
   50% {
-    opacity: 0.8;
+    opacity: 0.7;
     box-shadow: 0 0 0 4px transparent;
   }
 }
@@ -164,6 +192,7 @@ body,
   animation: fade-in 0.3s ease both;
 }
 
+/* ── Base element styles ──────────────────────────────────────────────────── */
 button {
   cursor: pointer;
   font-family: var(--font-display);
@@ -171,4 +200,9 @@ button {
 input,
 select {
   font-family: var(--font-display);
+}
+
+/* ── Grid background — disabled ──────────────────────────────────────────── */
+.grid-bg {
+  background-image: none;
 }

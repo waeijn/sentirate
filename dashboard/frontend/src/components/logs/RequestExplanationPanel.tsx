@@ -1,4 +1,4 @@
-﻿import { ClassBadge, ActionBadge } from "../common/Badge";
+import { ClassBadge, ActionBadge } from "../common/Badge";
 import type { LogEntry, Classification } from "../../types";
 
 interface RequestExplanationPanelProps {
@@ -105,7 +105,7 @@ function MarkerRow({
           marginBottom: 6,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
           {label}
         </span>
         <span
@@ -127,9 +127,9 @@ function MarkerRow({
       <div
         style={{
           width: "100%",
-          height: 4,
+          height: 5,
           background: "var(--border)",
-          borderRadius: 2,
+          borderRadius: 3,
           overflow: "hidden",
           marginBottom: 5,
         }}
@@ -139,7 +139,7 @@ function MarkerRow({
             height: "100%",
             width: `${pct}%`,
             background: color,
-            borderRadius: 2,
+            borderRadius: 3,
             transition: "width 0.5s ease",
           }}
         />
@@ -212,8 +212,10 @@ export function RequestExplanationPanel({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "var(--bg-panel)",
-        borderLeft: entry ? "1px solid var(--border)" : "none",
+        background: "var(--glass-bg)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        borderLeft: entry ? "1px solid var(--glass-border)" : "none",
       }}
     >
       {entry && (
@@ -221,7 +223,7 @@ export function RequestExplanationPanel({
           {/* Header */}
           <div
             style={{
-              padding: "20px 20px 14px",
+              padding: "24px 24px 16px",
               borderBottom: "1px solid var(--border)",
               display: "flex",
               justifyContent: "space-between",
@@ -232,7 +234,7 @@ export function RequestExplanationPanel({
             <div>
               <h3
                 style={{
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: 700,
                   color: "var(--text)",
                   marginBottom: 3,
@@ -252,7 +254,7 @@ export function RequestExplanationPanel({
                 color: "var(--text-muted)",
                 cursor: "pointer",
                 padding: 4,
-                borderRadius: 6,
+                borderRadius: "var(--radius-sm)",
                 transition: "color 0.15s",
                 flexShrink: 0,
               }}
@@ -279,7 +281,7 @@ export function RequestExplanationPanel({
           </div>
 
           {/* Scrollable body */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
             {/* Meta rows */}
             {[
               { label: "Client IP", value: entry.clientIp },
@@ -291,15 +293,15 @@ export function RequestExplanationPanel({
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 10,
+                  marginBottom: 14,
                 }}
               >
-                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
                   {r.label}
                 </span>
                 <span
                   style={{
-                    fontSize: 12,
+                    fontSize: 13,
                     color: "var(--text)",
                     fontFamily: "var(--font-mono)",
                     fontWeight: 500,
@@ -314,10 +316,10 @@ export function RequestExplanationPanel({
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 10,
+                marginBottom: 14,
               }}
             >
-              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
                 Classification
               </span>
               <ClassBadge type={entry.classification} />
@@ -327,10 +329,10 @@ export function RequestExplanationPanel({
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 20,
+                marginBottom: 24,
               }}
             >
-              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
                 Action
               </span>
               <ActionBadge type={entry.action} />
@@ -470,15 +472,15 @@ export function RequestExplanationPanel({
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  marginBottom: 7,
+                  marginBottom: 14,
                 }}
               >
-                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
                   {r.label}
                 </span>
                 <span
                   style={{
-                    fontSize: 12,
+                    fontSize: 13,
                     color: "var(--text)",
                     fontFamily: "var(--font-mono)",
                     fontWeight: 500,
@@ -493,7 +495,7 @@ export function RequestExplanationPanel({
           {/* Footer */}
           <div
             style={{
-              padding: "12px 20px",
+              padding: "14px 24px",
               borderTop: `2px solid ${CLASS_COLOR[entry.classification]}33`,
               background: `${CLASS_COLOR[entry.classification]}08`,
               flexShrink: 0,
