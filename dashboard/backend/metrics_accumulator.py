@@ -90,7 +90,7 @@ class MetricsAccumulator:
 
         # ── Global metrics ────────────────────────────────────────────
         self._global["total_requests"] += 1
-        if decision == "BLOCKED":
+        if decision in ("BLOCKED", "THROTTLED"):
             self._global["blocked"] += 1
             self._global[f"{gt_class}_blocked"] += 1
         else:

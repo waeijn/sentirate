@@ -237,7 +237,12 @@ class AdaptiveRateLimiter:
             self._class_cache[ip] = classification
             asyncio.create_task(self._init_ip_redis(ip, classification))
 
-        decision    = "ADMITTED" if allowed else "BLOCKED"
+        if allowed:
+            decision = "ADMITTED"
+        elif classification == TrafficClass.SUSPICIOUS:
+            decision = "BLOCKED"
+        else:
+            decision = "THROTTLED"
         capacity, refill_rate = BUCKET_PROFILES[classification.value]
         retry       = round(1.0 / refill_rate, 3) if refill_rate > 0 else 999
 
@@ -252,8 +257,8 @@ class AdaptiveRateLimiter:
                 decision, latency_ms, window_key,
             )
 
-        # 3. Queue heuristic evaluation for ADMITTED requests only
-        if decision == "ADMITTED":
+        # 3. Queue heuristic evaluation for ADMITTED requests, OR to check if a bot is still attacking
+        if decision == "ADMITTED" or classification == TrafficClass.SUSPICIOUS:
             self._worker_queue.submit(
                 ip, now, classification, tokens_left, decision, endpoint, latency_ms
             )
@@ -451,14 +456,16 @@ class AdaptiveRateLimiter:
             # during burst phases must be allowed to recover naturally when
             # their metrics normalize — not locked for 60 seconds.
             penalty_key = f"{REDIS_NS}:penalty:{ip}"
-            if new_class == TrafficClass.SUSPICIOUS and ip.startswith("203.0."):
-                # Set or refresh the penalty timer for confirmed attackers
+            if new_class == TrafficClass.SUSPICIOUS:
+                # Set or refresh the penalty timer for ANY suspicious IP
                 await self._redis.set(penalty_key, "1", ex=PENALTY_COOLDOWN_S)
-            elif current_class == TrafficClass.SUSPICIOUS and ip.startswith("203.0."):
-                # Attacker is trying to escape — check if penalty is still active
+            elif current_class == TrafficClass.SUSPICIOUS:
+                # Suspicious IP is trying to escape — check if penalty is still active
                 penalty_active = await self._redis.exists(penalty_key)
                 if penalty_active:
                     new_class = TrafficClass.SUSPICIOUS  # Stay locked
+                    # Refresh the timer because they are still sending traffic!
+                    await self._redis.set(penalty_key, "1", ex=PENALTY_COOLDOWN_S)
 
             logger.debug(
                 "[CLI LOG] IP: %-15s | Eval → Class: %-10s | λ: %6.2f req/s | σ: %.4fs | BurstFreq: %5.1f/min | Persist: %5.1fs",
@@ -563,7 +570,12 @@ class AdaptiveRateLimiter:
         persistence= markers.get("persistence", 0.0)
 
         reasons = []
-        action_text = "admitted" if decision == "ADMITTED" else "blocked"
+        if decision == "ADMITTED":
+            action_text = "admitted"
+        elif decision == "THROTTLED":
+            action_text = "temporarily throttled"
+        else:
+            action_text = "blocked"
 
         if classification == TrafficClass.SUSPICIOUS:
             if sigma <= SIGMA_BOT_THRESHOLD and sigma >= 0:

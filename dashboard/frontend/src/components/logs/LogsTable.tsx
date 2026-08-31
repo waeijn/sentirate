@@ -130,8 +130,8 @@ function PillButton({
 const COL_HEADERS = [
   { label: "Timestamp", centered: false },
   { label: "Client IP", centered: false },
-  { label: "Rate (╬╗)", centered: false },
-  { label: "Sigma (╧â)", centered: false },
+  { label: "Rate (λ)", centered: false },
+  { label: "Sigma (σ)", centered: false },
   { label: "Burst Freq", centered: false },
   { label: "Persistence", centered: false },
   { label: "Classification", centered: false },

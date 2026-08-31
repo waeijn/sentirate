@@ -18,6 +18,21 @@ export function ExportReportDropdown({ entries }: { entries: LogEntry[] }) {
   }, []);
 
   const exportCSV = () => {
+    const total = entries.length;
+    const allowed = entries.filter(e => e.action === "allowed").length;
+    const throttled = entries.filter(e => e.action === "throttled").length;
+    const blocked = entries.filter(e => e.action === "blocked").length;
+    const pct = (val: number) => total > 0 ? ((val / total) * 100).toFixed(1) : "0.0";
+
+    const summaryLines = [
+      `"EXECUTIVE TRAFFIC SUMMARY"`,
+      `"Total Requests",${total}`,
+      `"Allowed Traffic",${allowed},${pct(allowed)}%`,
+      `"Throttled Bursts",${throttled},${pct(throttled)}%`,
+      `"Blocked Threats",${blocked},${pct(blocked)}%`,
+      `""`,
+    ];
+
     const headers = [
       "Timestamp",
       "Source IP Address",
@@ -48,7 +63,7 @@ export function ExportReportDropdown({ entries }: { entries: LogEntry[] }) {
       ].map(String);
     });
 
-    const csvString = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const csvString = [...summaryLines, headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
       
@@ -65,12 +80,60 @@ export function ExportReportDropdown({ entries }: { entries: LogEntry[] }) {
     const doc = new jsPDF("landscape");
     
     doc.setFontSize(16);
-    doc.text("Raw Data Logging for Statistical Analysis", 14, 15);
+    doc.text("Traffic & Heuristics Audit Report", 14, 15);
     
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(`Generated at: ${new Date().toLocaleString()}`, 14, 22);
-    doc.text(`Total Events Exported: ${entries.length}`, 14, 28);
+
+    // --- Executive Telemetry Summary ---
+    const total = entries.length;
+    const allowed = entries.filter(e => e.action === "allowed").length;
+    const throttled = entries.filter(e => e.action === "throttled").length;
+    const blocked = entries.filter(e => e.action === "blocked").length;
+
+    const pct = (val: number) => total > 0 ? ((val / total) * 100).toFixed(1) : "0.0";
+    
+    doc.setFontSize(12);
+    doc.setTextColor(20, 20, 30);
+    doc.setFont("helvetica", "bold");
+    doc.text("Executive Traffic Summary", 14, 32);
+
+    const boxY = 36;
+    const boxW = 60;
+    const boxH = 18;
+    const gap = 6;
+
+    const drawBox = (idx: number, title: string, count: number, isTotal: boolean, c: any) => {
+        const x = 14 + (boxW + gap) * idx;
+        
+        doc.setDrawColor(c.br[0], c.br[1], c.br[2]);
+        doc.setFillColor(c.bg[0], c.bg[1], c.bg[2]);
+        doc.roundedRect(x, boxY, boxW, boxH, 2, 2, "FD");
+
+        doc.setFontSize(8);
+        doc.setTextColor(c.t1[0], c.t1[1], c.t1[2]);
+        doc.setFont("helvetica", "bold");
+        doc.text(title, x + 4, boxY + 7);
+
+        doc.setFontSize(14);
+        doc.setTextColor(c.t2[0], c.t2[1], c.t2[2]);
+        const valText = isTotal ? `${count}` : `${count} (${pct(count)}%)`;
+        doc.text(valText, x + 4, boxY + 15);
+    };
+
+    drawBox(0, "TOTAL REQUESTS", total, true, {
+        br: [226, 232, 240], bg: [248, 250, 252], t1: [100, 116, 139], t2: [15, 23, 42]
+    });
+    drawBox(1, "ALLOWED TRAFFIC", allowed, false, {
+        br: [187, 247, 208], bg: [240, 253, 244], t1: [22, 163, 74], t2: [21, 128, 61]
+    });
+    drawBox(2, "THROTTLED BURSTS", throttled, false, {
+        br: [254, 240, 138], bg: [254, 252, 232], t1: [202, 138, 4], t2: [161, 98, 7]
+    });
+    drawBox(3, "BLOCKED THREATS", blocked, false, {
+        br: [254, 202, 202], bg: [254, 242, 242], t1: [220, 38, 38], t2: [185, 28, 28]
+    });
 
     const headers = [
       "Timestamp",
@@ -101,7 +164,7 @@ export function ExportReportDropdown({ entries }: { entries: LogEntry[] }) {
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: 35,
+      startY: 60,
       theme: 'grid',
       headStyles: { fillColor: [44, 44, 60] },
       styles: { fontSize: 8 },
