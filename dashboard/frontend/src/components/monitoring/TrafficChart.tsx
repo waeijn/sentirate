@@ -11,9 +11,9 @@ import type { TrafficPoint } from "../../types";
 
 // ── Figma-exact colors ────────────────────────────────────────────────────
 const COLORS = {
-  normal: "#30D158",
-  bursty: "#FF9F0A",
-  suspicious: "#FF453A",
+  normal: "#10b981", // Emerald Green
+  bursty: "#f59e0b", // Amber
+  suspicious: "#e11d48", // Rose Red
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -23,9 +23,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       style={{
         background: "var(--bg-elevated)",
         border: "1px solid var(--border)",
-        borderRadius: 8,
-        padding: "10px 14px",
+        borderRadius: "var(--radius-sm)",
+        padding: "12px 16px",
         fontSize: 12,
+        boxShadow: "var(--card-shadow)",
       }}
     >
       <div style={{ color: "var(--text-muted)", marginBottom: 6 }}>{label}</div>
@@ -68,32 +69,47 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-// ── Custom legend — top right, matching Figma ─────────────────────────────
-function ChartLegend() {
+const LEGEND_COLORS = {
+  normal: { color: "var(--normal)", bg: "var(--normal-dim)" },
+  bursty: { color: "var(--bursty)", bg: "var(--bursty-dim)" },
+  suspicious: { color: "var(--suspicious)", bg: "var(--suspicious-dim)" },
+};
+
+function ChartLegend({ percentages }: { percentages: Record<string, number> }) {
   return (
-    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-      {Object.entries(COLORS).map(([key, color]) => (
+    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      {Object.entries(LEGEND_COLORS).map(([key, style]) => (
         <div
           key={key}
-          style={{ display: "flex", alignItems: "center", gap: 5 }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: style.bg,
+            border: `1px solid ${style.bg}`,
+            padding: "4px 10px",
+            borderRadius: 12,
+          }}
         >
           <span
             style={{
-              width: 8,
-              height: 8,
+              width: 6,
+              height: 6,
               borderRadius: "50%",
-              background: color,
+              background: style.color,
+              boxShadow: `0 0 6px ${style.color}`,
               display: "inline-block",
             }}
           />
           <span
             style={{
-              fontSize: 12,
-              color: "var(--text-dim)",
+              fontSize: 11,
+              color: style.color,
+              fontWeight: 600,
               textTransform: "capitalize",
             }}
           >
-            {key}
+            {key}: {percentages[key] || 0}%
           </span>
         </div>
       ))}
@@ -101,7 +117,34 @@ function ChartLegend() {
   );
 }
 
-export function TrafficChart({ data }: { data: TrafficPoint[] }) {
+export function TrafficChart({ data, uptime = 0 }: { data: TrafficPoint[], uptime?: number }) {
+  const formatUptime = (seconds: number) => {
+    if (seconds == null) return "Live";
+    if (seconds < 60) return `Live (${seconds}s)`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m < 60) return `Live (${m}m ${s}s)`;
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    return `Live (${h}h ${min}m)`;
+  };
+  
+  // Calculate percentages
+  let totalNormal = 0;
+  let totalBursty = 0;
+  let totalSuspicious = 0;
+  data.forEach((d) => {
+    totalNormal += d.normal;
+    totalBursty += d.bursty;
+    totalSuspicious += d.suspicious;
+  });
+  const total = totalNormal + totalBursty + totalSuspicious;
+  const percentages = {
+    normal: total ? Math.round((totalNormal / total) * 100) : 0,
+    bursty: total ? Math.round((totalBursty / total) * 100) : 0,
+    suspicious: total ? Math.round((totalSuspicious / total) * 100) : 0,
+  };
+
   return (
     <div
       style={{
@@ -110,11 +153,11 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
         WebkitBackdropFilter: "var(--glass-blur)",
         border: "1px solid var(--glass-border)",
         borderRadius: "var(--radius)",
-        boxShadow: "var(--shadow-md)",
+        boxShadow: "var(--card-shadow)",
         padding: 24,
       }}
     >
-      {/* Header row — title left, legend right (matches Figma) */}
+      {/* Header row — title left, controls right */}
       <div
         style={{
           display: "flex",
@@ -135,10 +178,43 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
             API Traffic Over Time
           </h2>
           <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            Classified by behavioral pattern — refreshes every 5s
+            Classified by behavioral pattern — refreshes every 2s
           </p>
         </div>
-        <ChartLegend />
+        
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          {/* Window Selector */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              padding: "4px 12px",
+              background: "transparent",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-muted)", fontSize: 11 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Window:
+            </div>
+            <div style={{ display: "flex", gap: 8, fontSize: 11, fontWeight: 500 }}>
+              <span style={{ color: "var(--accent)", background: "var(--accent-dim)", padding: "2px 8px", borderRadius: 4 }}>
+                {formatUptime(uptime)}
+              </span>
+              <span style={{ color: "var(--text-muted)", padding: "2px 4px", cursor: "pointer" }}>15m</span>
+              <span style={{ color: "var(--text-muted)", padding: "2px 4px", cursor: "pointer" }}>30m</span>
+              <span style={{ color: "var(--text-muted)", padding: "2px 4px", cursor: "pointer" }}>1h</span>
+            </div>
+          </div>
+          
+          {/* Legend */}
+          <ChartLegend percentages={percentages} />
+        </div>
       </div>
 
       {data.length === 0 ? (
@@ -231,7 +307,9 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
               fill="url(#gradNormal)"
               dot={false}
               activeDot={{ r: 4, strokeWidth: 0 }}
-              isAnimationActive={false}
+              isAnimationActive={true}
+              animationDuration={2000}
+              animationEasing="linear"
             />
             <Area
               type="monotone"
@@ -241,7 +319,9 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
               fill="url(#gradBursty)"
               dot={false}
               activeDot={{ r: 4, strokeWidth: 0 }}
-              isAnimationActive={false}
+              isAnimationActive={true}
+              animationDuration={2000}
+              animationEasing="linear"
             />
             <Area
               type="monotone"
@@ -251,7 +331,9 @@ export function TrafficChart({ data }: { data: TrafficPoint[] }) {
               fill="url(#gradSuspicious)"
               dot={false}
               activeDot={{ r: 4, strokeWidth: 0 }}
-              isAnimationActive={false}
+              isAnimationActive={true}
+              animationDuration={2000}
+              animationEasing="linear"
             />
           </AreaChart>
         </ResponsiveContainer>

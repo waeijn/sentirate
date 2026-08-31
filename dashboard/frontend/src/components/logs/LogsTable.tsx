@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ClassBadge, ActionBadge } from "../common/Badge";
 import type { LogEntry } from "../../types";
 
@@ -6,9 +6,11 @@ interface LogsTableProps {
   entries: LogEntry[];
   selected: LogEntry | null;
   onSelect: (entry: LogEntry | null) => void;
+  initialSearch?: string;
+  highlightIp?: string;
 }
 
-// ΓöÇΓöÇ Mini value bar ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Mini value bar ──────────────────────────────────────────────────────────
 
 function ValueBar({
   value,
@@ -95,10 +97,12 @@ function SigmaBar({ value }: { value: number | null }) {
 
 function PillButton({
   active,
+  activeColor = "var(--text)",
   onClick,
   children,
 }: {
   active: boolean;
+  activeColor?: string;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -110,8 +114,8 @@ function PillButton({
         fontWeight: active ? 600 : 400,
         padding: "5px 14px",
         borderRadius: 20,
-        border: `1px solid ${active ? "var(--text)" : "var(--border)"}`,
-        background: active ? "var(--text)" : "transparent",
+        border: `1px solid ${active ? activeColor : "var(--border)"}`,
+        background: active ? activeColor : "transparent",
         color: active ? "var(--bg)" : "var(--text-muted)",
         cursor: "pointer",
         transition: "all 0.15s",
@@ -135,11 +139,17 @@ const COL_HEADERS = [
   { label: "Details", centered: true },
 ];
 
-export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
-  const [search, setSearch] = useState("");
+export function LogsTable({ entries, selected, onSelect, initialSearch, highlightIp }: LogsTableProps) {
+  const [search, setSearch] = useState(initialSearch || "");
   const [classFilter, setClassFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  useEffect(() => {
+    if (initialSearch !== undefined) {
+      setSearch(initialSearch);
+    }
+  }, [initialSearch]);
 
   const filtered = entries.filter((e) => {
     const matchesSearch =
@@ -155,14 +165,62 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
   const toggle = (entry: LogEntry) =>
     onSelect(selected?.id === entry.id ? null : entry);
 
-  // ΓöÇΓöÇ active filter count badge on the Filters button ΓöÇΓöÇ
+  // ── active filter count badge on the Filters button ──
   const activeFilterCount =
     (classFilter !== "all" ? 1 : 0) + (actionFilter !== "all" ? 1 : 0);
 
+  // Calculate metrics
+  const allowed = filtered.filter((e) => e.action === "allowed").length;
+  const throttled = filtered.filter((e) => e.action === "throttled").length;
+  const blocked = filtered.filter((e) => e.action === "blocked").length;
+  const total = filtered.length || 1; // prevent div by zero
+
+  const metricBlock = (title: string, val: number, subtitle: string, color: string, isZero: boolean) => (
+    <div
+      style={{
+        flex: 1,
+        background: "var(--glass-bg)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        border: `1px solid ${isZero ? "var(--glass-border)" : color}`,
+        borderRadius: "var(--radius-sm)",
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: isZero ? "var(--text-muted)" : color, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+          {title}
+        </span>
+        {!isZero && title !== "FILTERED RECORDS" && (
+          <span style={{ fontSize: 11, color, fontWeight: 600 }}>
+            {Math.round((val / total) * 100)}%
+          </span>
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+        <span style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text)" }}>
+          {val}
+        </span>
+        <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{subtitle}</span>
+      </div>
+    </div>
+  );
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* ΓöÇΓöÇ Toolbar ΓöÇΓöÇ */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* ── Summary Metrics ── */}
+      <div style={{ display: "flex", gap: 16 }}>
+        {metricBlock("FILTERED RECORDS", filtered.length, "events", "var(--text-muted)", true)}
+        {metricBlock("ALLOWED", allowed, "passed", "var(--normal)", allowed === 0)}
+        {metricBlock("THROTTLED", throttled, "queued", "var(--bursty)", throttled === 0)}
+        {metricBlock("BLOCKED", blocked, "denied", "var(--suspicious)", blocked === 0)}
+      </div>
+
+      {/* ── Toolbar ── */}
+      <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
         {/* Search */}
         <div
           style={{
@@ -265,7 +323,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
             WebkitBackdropFilter: "var(--glass-blur)",
             border: "1px solid var(--glass-border)",
             borderRadius: "var(--radius)",
-            boxShadow: "var(--shadow-md)",
+            boxShadow: "var(--card-shadow)",
             padding: "16px 20px",
             display: "flex",
             gap: 32,
@@ -286,15 +344,23 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
               Classification
             </span>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {["all", "normal", "bursty", "suspicious"].map((key) => (
-                <PillButton
-                  key={key}
-                  active={classFilter === key}
-                  onClick={() => setClassFilter(key)}
-                >
-                  {key.charAt(0).toUpperCase() + key.slice(1)}
-                </PillButton>
-              ))}
+              {["all", "normal", "bursty", "suspicious"].map((key) => {
+                let activeColor = "var(--text)";
+                if (key === "normal") activeColor = "var(--normal)";
+                if (key === "bursty") activeColor = "var(--bursty)";
+                if (key === "suspicious") activeColor = "var(--suspicious)";
+                
+                return (
+                  <PillButton
+                    key={key}
+                    active={classFilter === key}
+                    activeColor={activeColor}
+                    onClick={() => setClassFilter(key)}
+                  >
+                    {key.charAt(0).toUpperCase() + key.slice(1)}
+                  </PillButton>
+                );
+              })}
             </div>
           </div>
 
@@ -312,15 +378,23 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
               Action
             </span>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {["all", "allowed", "throttled", "blocked"].map((key) => (
-                <PillButton
-                  key={key}
-                  active={actionFilter === key}
-                  onClick={() => setActionFilter(key)}
-                >
-                  {key.charAt(0).toUpperCase() + key.slice(1)}
-                </PillButton>
-              ))}
+              {["all", "allowed", "throttled", "blocked"].map((key) => {
+                let activeColor = "var(--text)";
+                if (key === "allowed") activeColor = "var(--normal)";
+                if (key === "throttled") activeColor = "var(--bursty)";
+                if (key === "blocked") activeColor = "var(--suspicious)";
+                
+                return (
+                  <PillButton
+                    key={key}
+                    active={actionFilter === key}
+                    activeColor={activeColor}
+                    onClick={() => setActionFilter(key)}
+                  >
+                    {key.charAt(0).toUpperCase() + key.slice(1)}
+                  </PillButton>
+                );
+              })}
             </div>
           </div>
 
@@ -357,7 +431,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
           WebkitBackdropFilter: "var(--glass-blur)",
           border: "1px solid var(--glass-border)",
           borderRadius: "var(--radius)",
-          boxShadow: "var(--shadow-md)",
+          boxShadow: "var(--card-shadow)",
           overflow: "hidden",
         }}
       >
@@ -377,7 +451,7 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                       fontWeight: 600,
                       color: "var(--text-muted)",
                       textTransform: "uppercase",
-                      letterSpacing: 0.8,
+                      letterSpacing: "0.1em",
                       whiteSpace: "nowrap",
                       background: "var(--glass-bg)",
                       backdropFilter: "var(--glass-blur)",
@@ -410,8 +484,10 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                   </td>
                 </tr>
               )}
-              {filtered.map((entry, index) => {
+              {filtered.map((entry) => {
                 const isSelected = selected?.id === entry.id;
+                const isHighlighted = highlightIp && entry.clientIp === highlightIp;
+                
                 const rateColor =
                   entry.requestRate > 30
                     ? "var(--suspicious)"
@@ -439,12 +515,16 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                       borderBottom: "1px solid var(--border)",
                       background: isSelected
                         ? "var(--bg-hover)"
-                        : "transparent",
+                        : isHighlighted
+                          ? "rgba(99, 102, 241, 0.12)" // Soft accent color for highlighted IP
+                          : "transparent",
                       cursor: "pointer",
                       transition: "background 0.15s",
                       borderLeft: isSelected
                         ? "2px solid var(--accent)"
-                        : "2px solid transparent",
+                        : isHighlighted
+                          ? "2px solid var(--accent)"
+                          : "2px solid transparent",
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected)
@@ -453,8 +533,9 @@ export function LogsTable({ entries, selected, onSelect }: LogsTableProps) {
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected)
-                        (e.currentTarget as HTMLElement).style.background =
-                          "transparent";
+                        (e.currentTarget as HTMLElement).style.background = isHighlighted 
+                          ? "rgba(99, 102, 241, 0.12)" 
+                          : "transparent";
                     }}
                   >
                     <td

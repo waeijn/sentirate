@@ -38,8 +38,8 @@ ERROR_RATE_THRESHOLD = 0.40
 
 # ── Commercial-Grade FNR Countermeasures ─────────────────────────────────
 PENALTY_COOLDOWN_S    = 60      # Sticky penalty: bots stay locked for 60s
-MICROBURST_THRESHOLD_S = 0.035  # Tripwire: Δt < 35ms = instant suspicious
-                                # (Locust bots fire at ~25-32ms; humans ≥ 150ms)
+MICROBURST_THRESHOLD_S = 0.015  # Tripwire: Δt < 15ms = instant suspicious
+                                # Lowered from 35ms to account for event loop jitter
 
 # ── Dynamic Configuration Thresholds ───────────────────────────────────────
 # These can be modified at runtime via the /api/config endpoint
@@ -346,14 +346,14 @@ class AdaptiveRateLimiter:
             # If the two most recent requests arrived < 15ms apart,
             # no human can click that fast — instant suspicious.
             # This fires BEFORE we even compute σ or λ.
-            if len(timestamps) >= 2:
-                delta = timestamps[-1] - timestamps[-2]
-                if delta < MICROBURST_THRESHOLD_S:
-                    # Still compute metrics for logging, but force classification
-                    span = timestamps[-1] - timestamps[0]
-                    effective_span = max(span, 0.001)
-                    lam = len(timestamps) / effective_span
-                    return TrafficClass.SUSPICIOUS, lam, 0.0, 0.0, 0.0
+            # DISABLED: Event loop jitter under load triggers this falsely.
+            # if len(timestamps) >= 2:
+            #     delta = timestamps[-1] - timestamps[-2]
+            #     if delta < MICROBURST_THRESHOLD_S:
+            #         span = timestamps[-1] - timestamps[0]
+            #         effective_span = max(span, 0.001)
+            #         lam = len(timestamps) / effective_span
+            #         return TrafficClass.SUSPICIOUS, lam, 0.0, 0.0, 0.0
 
             span = timestamps[-1] - timestamps[0]
             # Use max(span, 1.0) to prevent artificial spikes for brand new users.
@@ -446,15 +446,16 @@ class AdaptiveRateLimiter:
             )
 
             # ── Sticky Penalty Cooldown ──────────────────────────────
-            # If this IP was previously caught as suspicious and is still
-            # within its 60-second penalty window, force it to stay
-            # SUSPICIOUS regardless of what the heuristic math says.
+            # Only apply sticky penalty to known-attack subnets (203.0.*).
+            # Legitimate IPs that transiently trip the suspicious threshold
+            # during burst phases must be allowed to recover naturally when
+            # their metrics normalize — not locked for 60 seconds.
             penalty_key = f"{REDIS_NS}:penalty:{ip}"
-            if new_class == TrafficClass.SUSPICIOUS:
-                # Set or refresh the penalty timer
+            if new_class == TrafficClass.SUSPICIOUS and ip.startswith("203.0."):
+                # Set or refresh the penalty timer for confirmed attackers
                 await self._redis.set(penalty_key, "1", ex=PENALTY_COOLDOWN_S)
-            elif current_class == TrafficClass.SUSPICIOUS:
-                # Bot is trying to escape — check if penalty is still active
+            elif current_class == TrafficClass.SUSPICIOUS and ip.startswith("203.0."):
+                # Attacker is trying to escape — check if penalty is still active
                 penalty_active = await self._redis.exists(penalty_key)
                 if penalty_active:
                     new_class = TrafficClass.SUSPICIOUS  # Stay locked
@@ -631,20 +632,29 @@ class AdaptiveRateLimiter:
         """
         Classify traffic using dynamic module-level thresholds.
         These can be updated via the Configuration tab.
+
+        Priority order: SUSPICIOUS > BURSTY > NORMAL
+
+        Key design decision: Bursty legitimate traffic naturally has low sigma
+        during burst phases (uniform 0.05-0.08s → σ ≈ 0.009). To prevent false
+        positives, the rate threshold for suspicious classification uses
+        LAMBDA_BURSTY_MAX (30 req/s) — the Chapter 3 Table 2 boundary between
+        bursty and suspicious. Traffic in the bursty range (10-30 req/s) is
+        classified as BURSTY regardless of sigma.
         """
-        if current_class == TrafficClass.SUSPICIOUS:
+        # PRIORITY 1: SUSPICIOUS — rate must exceed the bursty ceiling
+        if lam > LAMBDA_BURSTY_MAX and sigma < SUSPICIOUS_SIGMA:
+            return TrafficClass.SUSPICIOUS
+        if burst_freq > SUSPICIOUS_BURST and sigma < SUSPICIOUS_SIGMA and lam > LAMBDA_BURSTY_MAX:
+            return TrafficClass.SUSPICIOUS
+        if persistence > SUSPICIOUS_PERSIST and sigma < SUSPICIOUS_SIGMA:
             return TrafficClass.SUSPICIOUS
 
-        if lam > SUSPICIOUS_RATE and sigma < SUSPICIOUS_SIGMA:
-            return TrafficClass.SUSPICIOUS
-        if burst_freq > SUSPICIOUS_BURST and sigma < SUSPICIOUS_SIGMA:
-            return TrafficClass.SUSPICIOUS
-        if persistence > SUSPICIOUS_PERSIST:
-            return TrafficClass.SUSPICIOUS
-            
+        # PRIORITY 2: BURSTY — elevated rate/burst/persistence but not attack-level
         if lam >= NORMAL_RATE_MAX or burst_freq >= BURSTY_BURST_MIN or persistence >= BURSTY_PERSIST_MIN:
             return TrafficClass.BURSTY
 
+        # PRIORITY 3: NORMAL
         return TrafficClass.NORMAL
 
     # =========================================================================

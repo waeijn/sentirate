@@ -41,6 +41,227 @@ def _(parser):
         include_in_web_ui=True,
     )
 
+
+# ── Custom Locust Web UI Enhancements ────────────────────────────────────────
+# Injects JavaScript that transforms the default text inputs into user-friendly
+# dropdowns for Traffic Profile and Number of Users.
+
+CUSTOM_UI_JS = """
+(function() {
+    // ── Utility: Set value on React-controlled input ────────────────────────
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype, 'value'
+    ).set;
+
+    function setReactValue(el, val) {
+        nativeSetter.call(el, val);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // ── Shared dropdown styling ─────────────────────────────────────────────
+    const selectCSS = `
+        width: 100%;
+        padding: 12.5px 14px;
+        background: transparent;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.23);
+        border-radius: 4px;
+        font-size: 1rem;
+        font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='rgba(255,255,255,0.7)' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        outline: none;
+    `;
+
+    const labelCSS = `
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 1rem;
+        font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+        margin-bottom: 8px;
+        display: block;
+    `;
+
+    // ── Build dropdown helper ───────────────────────────────────────────────
+    function createDropdown(options, onChange) {
+        const select = document.createElement('select');
+        select.style.cssText = selectCSS;
+        // Hover and focus effects
+        select.onmouseover = () => select.style.border = '1px solid #fff';
+        select.onmouseout = () => select.style.border = '1px solid rgba(255, 255, 255, 0.23)';
+        select.onfocus = () => select.style.border = '2px solid #90caf9';
+        select.onblur = () => select.style.border = '1px solid rgba(255, 255, 255, 0.23)';
+
+        options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            o.style.background = '#1d2228'; // Dark bg for the dropdown options list
+            select.appendChild(o);
+        });
+        select.addEventListener('change', onChange);
+        return select;
+    }
+
+    function hideMuiRoot(input) {
+        // Find the top-level MUI component wrapper
+        let root = input.closest('.MuiFormControl-root');
+        if (!root) root = input.parentElement.parentElement;
+        if (root) {
+            root.style.position = 'absolute';
+            root.style.opacity = '0';
+            root.style.pointerEvents = 'none';
+            root.style.zIndex = '-1';
+            root.style.height = '0';
+            root.style.overflow = 'hidden';
+            root.style.margin = '0';
+        }
+        return root;
+    }
+
+    // ── 1. Transform "Number of users" input ────────────────────────────────
+    function enhanceUserCount() {
+        const input = document.querySelector('input[name="userCount"], input[name="user_count"]');
+        if (!input || input.dataset.enhanced) return false;
+        input.dataset.enhanced = 'true';
+
+        const muiRoot = hideMuiRoot(input);
+        
+        const container = document.createElement('div');
+        container.style.cssText = 'margin-top: 16px; margin-bottom: 8px; width: 100%;';
+
+        const label = document.createElement('label');
+        label.textContent = 'Number of users (peak concurrency) *';
+        label.style.cssText = labelCSS;
+
+        const customInput = document.createElement('input');
+        customInput.type = 'number';
+        customInput.min = '1';
+        customInput.placeholder = 'Enter number of users...';
+        customInput.style.cssText = selectCSS; // Match the select box style
+        customInput.style.display = 'none';
+        customInput.style.marginTop = '8px';
+        customInput.addEventListener('input', function() {
+            if (this.value) setReactValue(input, this.value);
+        });
+
+        const select = createDropdown([
+            { value: '100',   label: '100 users' },
+            { value: '250',   label: '250 users' },
+            { value: '500',   label: '500 users' },
+            { value: '1000',  label: '1,000 users' },
+            { value: '5000',  label: '5,000 users' },
+            { value: '10000', label: '10,000 users' },
+            { value: 'custom', label: 'Custom...' },
+        ], function() {
+            if (this.value === 'custom') {
+                customInput.style.display = 'block';
+                customInput.focus();
+            } else {
+                customInput.style.display = 'none';
+                setReactValue(input, this.value);
+            }
+        });
+
+        container.appendChild(label);
+        container.appendChild(select);
+        container.appendChild(customInput);
+        
+        muiRoot.parentNode.insertBefore(container, muiRoot);
+
+        // Set default to 100
+        select.value = '100';
+        setReactValue(input, '100');
+        return true;
+    }
+
+    // ── 2. Transform "Traffic Profile" custom param ─────────────────────────
+    function enhanceTrafficProfile() {
+        const input = document.querySelector('input[name="traffic-profile"], input[name="trafficProfile"]');
+        if (!input || input.dataset.enhanced) return false;
+        input.dataset.enhanced = 'true';
+
+        const muiRoot = hideMuiRoot(input);
+
+        const container = document.createElement('div');
+        container.style.cssText = 'margin-top: 16px; margin-bottom: 8px; width: 100%;';
+
+        const label = document.createElement('label');
+        label.textContent = 'Traffic Profile';
+        label.style.cssText = labelCSS;
+
+        const select = createDropdown([
+            { value: '',           label: 'Mixed (All three, weighted)' },
+            { value: 'normal',     label: 'Normal Traffic' },
+            { value: 'bursty',     label: 'Bursty Legitimate' },
+            { value: 'suspicious', label: 'Suspicious / Abusive' },
+        ], function() {
+            setReactValue(input, this.value);
+        });
+
+        container.appendChild(label);
+        container.appendChild(select);
+        
+        muiRoot.parentNode.insertBefore(container, muiRoot);
+
+        // Default to mixed
+        select.value = '';
+        setReactValue(input, '');
+        return true;
+    }
+
+    // ── 3. Also expand "Custom parameters" section automatically ────────────
+    function expandCustomParams() {
+        const toggles = document.querySelectorAll('.MuiAccordionSummary-root, [class*="Accordion"] button, [role="button"]');
+        toggles.forEach(el => {
+            if (el.textContent && el.textContent.includes('Custom parameters')) {
+                const accordion = el.closest('[class*="Accordion"]') || el.parentElement;
+                if (accordion && !accordion.classList.contains('Mui-expanded') && !accordion.dataset.autoExpanded) {
+                    accordion.dataset.autoExpanded = 'true';
+                    el.click();
+                }
+            }
+        });
+    }
+
+    // ── 4. Run enhancement with persistent MutationObserver ─────────────────
+    function tryEnhance() {
+        enhanceUserCount();
+        enhanceTrafficProfile();
+        expandCustomParams();
+    }
+
+    // Try immediately, then continuously observe DOM for React modal renders
+    tryEnhance();
+    const observer = new MutationObserver(() => {
+        tryEnhance();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
+"""
+
+@events.init.add_listener
+def on_locust_init(environment, **kw):
+    """Inject custom dropdown UI into Locust's web interface."""
+    if environment.web_ui:
+        from flask import make_response
+
+        @environment.web_ui.app.after_request
+        def inject_custom_ui(response):
+            if response.content_type and 'text/html' in response.content_type:
+                script_tag = f'<script>{CUSTOM_UI_JS}</script>'
+                data = response.get_data(as_text=True)
+                data = data.replace('</body>', f'{script_tag}</body>')
+                response.set_data(data)
+                # Remove Content-Length since we modified the body
+                response.headers.pop('Content-Length', None)
+            return response
+
 @events.test_start.add_listener
 def filter_by_profile(environment, **kwargs):
     profile = environment.parsed_options.traffic_profile.strip().lower()
@@ -232,9 +453,9 @@ def on_test_start(environment, **kwargs):
     print("  Scenarios: Normal | Bursty | Suspicious")
     print("=" * 60)
     print("  Thresholds (Chapter 3 Table 2):")
-    print("    Normal:     λ ≤ 10 req/s")
-    print("    Bursty:     11 ≤ λ ≤ 30 req/s")
-    print("    Suspicious: λ > 30 req/s")
+    print("    Normal:     rate <= 10 req/s")
+    print("    Bursty:     11 <= rate <= 30 req/s")
+    print("    Suspicious: rate > 30 req/s")
     print("=" * 60)
     print("  REMINDER: Reset state before each run:")
     print("  Invoke-RestMethod -Method DELETE -Uri http://localhost:8050/api/clients")

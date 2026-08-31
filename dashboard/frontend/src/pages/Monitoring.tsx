@@ -14,6 +14,8 @@ interface MonitoringProps {
     tnr: number | null;
     accuracy: number | null;
   };
+  uptime: number;
+  onNavigateToLogs?: (ipFilter?: string, ipHighlight?: string) => void;
 }
 
 export function Monitoring({
@@ -21,6 +23,8 @@ export function Monitoring({
   chartData,
   alerts,
   analytics,
+  uptime,
+  onNavigateToLogs,
 }: MonitoringProps) {
   return (
     <div
@@ -49,7 +53,7 @@ export function Monitoring({
         </p>
       </div>
 
-      {/* Stat cards — pass analytics only to the acceptance rate card */}
+      {/* Stat cards */}
       <div
         style={{
           display: "grid",
@@ -69,10 +73,10 @@ export function Monitoring({
 
       {/* Chart + Alerts */}
       <div
-        style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20 }}
+        style={{ display: "flex", flexDirection: "column", gap: 24 }}
       >
-        <TrafficChart data={chartData} />
-        <RecentAlerts alerts={alerts} />
+        <TrafficChart data={chartData} uptime={uptime} />
+        <RecentAlerts alerts={alerts} onNavigateToLogs={onNavigateToLogs} />
       </div>
     </div>
   );

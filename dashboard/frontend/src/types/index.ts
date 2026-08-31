@@ -25,6 +25,8 @@ export interface Alert {
   severity: AlertSeverity;
   message: string;
   timestamp: string;
+  ip: string;
+  statusText: string;
 }
 
 export interface LogEntry {
@@ -68,6 +70,7 @@ export interface SystemSummary {
   fnr_percent: number;
   avg_latency_ms: number;
   p95_latency_ms: number;
+  uptime_seconds?: number;
   top_clients: TopClient[];
 }
 

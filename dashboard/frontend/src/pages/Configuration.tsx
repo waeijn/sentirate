@@ -250,26 +250,44 @@ function Slider({
           </span>
         </div>
       </div>
-      <div style={{ position: "relative", height: 6, marginBottom: 5 }}>
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: 4,
-            background: "var(--bg-hover)",
-            border: "1px solid var(--border)",
-          }}
-        />
+      <div style={{ position: "relative", height: 16, display: "flex", alignItems: "center", marginBottom: 5 }}>
+        {/* Unfilled track */}
         <div
           style={{
             position: "absolute",
             left: 0,
-            top: 0,
-            bottom: 0,
+            right: 0,
+            height: 4,
+            borderRadius: 2,
+            background: "var(--bg-hover)",
+            border: "1px solid var(--border)",
+          }}
+        />
+        {/* Filled track */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            height: 4,
             width: `${pct}%`,
-            borderRadius: 4,
-            background: color,
+            borderRadius: 2,
+            background: "var(--accent)", // Brand accent color
             transition: "width 0.05s",
+          }}
+        />
+        {/* Thumb */}
+        <div
+          style={{
+            position: "absolute",
+            left: `calc(${pct}% - 8px)`,
+            width: 16,
+            height: 16,
+            background: "#ffffff",
+            borderRadius: "50%",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+            border: "1px solid rgba(0,0,0,0.1)",
+            pointerEvents: "none",
+            transition: "left 0.05s",
           }}
         />
         <input
@@ -940,28 +958,27 @@ export function Configuration() {
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(4,1fr)",
-            gap: 0,
+            gap: 6,
+            padding: 6,
             marginBottom: 14,
             background: "var(--bg-hover)",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius-sm)",
-            overflow: "hidden",
           }}
         >
-          {PRESETS.map((p, i) => {
+          {PRESETS.map((p) => {
             const active = preset.key === p.key;
             return (
               <button
                 key={p.key}
                 onClick={() => handlePresetSelect(p)}
                 style={{
-                  background: active ? "var(--bg-elevated)" : "transparent",
-                  border: "none",
-                  borderRight: i < 3 ? "1px solid var(--border)" : "none",
-                  borderBottom: active
-                    ? `2px solid ${p.accentColor}`
-                    : "2px solid transparent",
-                  padding: "14px 8px",
+                  background: active ? p.accentDim : "transparent",
+                  border: active
+                    ? `1px solid ${p.accentColor}`
+                    : "1px solid transparent",
+                  borderRadius: 10,
+                  padding: "12px 8px",
                   cursor: "pointer",
                   display: "flex",
                   flexDirection: "column",
@@ -969,6 +986,7 @@ export function Configuration() {
                   gap: 6,
                   transition: "all 0.15s",
                   position: "relative",
+                  boxShadow: active ? "0 2px 8px rgba(0,0,0,0.1)" : "none",
                 }}
               >
                 {p.key === "balanced" && (

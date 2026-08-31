@@ -23,6 +23,7 @@ from middleware import AdaptiveRateLimiter
 from heuristic_engine import TrafficType
 
 logger = logging.getLogger("websocket")
+START_TIME = time.time()
 
 
 # =============================================================================
@@ -105,9 +106,9 @@ def register_socketio_events(sio, limiter: AdaptiveRateLimiter):
     # ── Background metrics broadcast ──────────────────────────────────────────
 
     async def broadcast_metrics():
-        """Push metrics_update to all connected clients every 3 seconds."""
+        """Push metrics_update to all connected clients every 2 seconds."""
         while True:
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
             try:
                 payload = await _build_metrics_payload(limiter) # ← await added
                 await sio.emit("metrics_update", payload)
@@ -169,7 +170,7 @@ async def _build_metrics_payload(limiter: AdaptiveRateLimiter) -> dict:
     fpr_val = metrics.get("fpr")
     fnr_val = metrics.get("fnr")
 
-    return {
+    payload = {
         "timestamp": str(int(now * 1000)),
         "summary": {
             "active_clients":  active_clients,
@@ -183,9 +184,12 @@ async def _build_metrics_payload(limiter: AdaptiveRateLimiter) -> dict:
             "p95_latency_ms":  metrics.get("p95_latency_ms", 0.0),
             "classifications": classifications,
             "throughput":      metrics.get("throughput", 0.0),
+            "uptime_seconds":  int(now - START_TIME),
         },
         "recent_events": recent_events,
     }
+    logger.info(f"Payload uptime: {payload['summary']['uptime_seconds']}")
+    return payload
 
 
 # =============================================================================

@@ -49,7 +49,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 sio = socketio.AsyncServer(
     async_mode           = "asgi",
     client_manager       = socketio.AsyncRedisManager(REDIS_URL),
-    cors_allowed_origins = "*",
+    cors_allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174").split(","),
     logger               = False,
     engineio_logger      = False,
 )
@@ -96,7 +96,7 @@ app = FastAPI(
 # CORS — allows the React dashboard (port 5173) to call this backend (port 8050)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
+    allow_origins     = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174").split(","),
     allow_credentials = True,
     allow_methods     = ["*"],
     allow_headers     = ["*"],

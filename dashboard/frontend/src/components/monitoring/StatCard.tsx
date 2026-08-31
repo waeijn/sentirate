@@ -66,9 +66,16 @@ const ICON_COLORS = {
 
 const ICON_BGS = {
   throughput: "var(--accent-dim)",
-  latency: "rgba(88, 86, 214, 0.12)", // accent-2 doesn't have a -dim variable, hardcode rgba
+  latency: "rgba(139, 92, 246, 0.12)", // accent-2 dim
   threats: "var(--suspicious-dim)",
   acceptance: "var(--normal-dim)",
+};
+
+const ICON_GLOWS = {
+  throughput: "var(--accent-glow)",
+  latency: "rgba(139, 92, 246, 0.15)", // accent-2 glow
+  threats: "var(--suspicious-glow)",
+  acceptance: "var(--normal-glow)",
 };
 
 // ─── Classification Accuracy Modal ────────────────────────────────────────
@@ -409,21 +416,24 @@ export function StatCard({
       )}
 
       <div
-        style={{
-          background: "var(--glass-bg)",
-          backdropFilter: "var(--glass-blur)",
-          WebkitBackdropFilter: "var(--glass-blur)",
-          border: "1px solid var(--glass-border)",
-          borderRadius: "var(--radius)",
-          boxShadow: "var(--shadow-md)",
-          padding: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          position: "relative",
-          overflow: "hidden",
-          transition: "border-color 0.2s",
-        }}
+        style={
+          {
+            "--card-glow": ICON_GLOWS[data.icon as keyof typeof ICON_GLOWS],
+            background: "var(--glass-bg)",
+            backdropFilter: "var(--glass-blur)",
+            WebkitBackdropFilter: "var(--glass-blur)",
+            border: "1px solid var(--glass-border)",
+            borderRadius: "var(--radius)",
+            boxShadow: "var(--card-shadow)",
+            padding: 24,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            position: "relative",
+            overflow: "hidden",
+            transition: "border-color 0.2s",
+          } as React.CSSProperties
+        }
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLElement).style.borderColor =
             "var(--border-light)";
