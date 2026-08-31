@@ -769,8 +769,8 @@ class AdaptiveRateLimiter:
             
         self._throughput_history.append((now, total))
         
-        # Remove entries older than 3.0 seconds to keep the window tight
-        while self._throughput_history and now - self._throughput_history[0][0] > 3.0:
+        # Remove entries older than 10.0 seconds to smooth the moving average
+        while self._throughput_history and now - self._throughput_history[0][0] > 10.0:
             self._throughput_history.popleft()
             
         throughput = 0.0
