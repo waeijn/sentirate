@@ -230,7 +230,7 @@ function Slider({
               fontFamily: "var(--font-mono)",
               fontSize: 15,
               fontWeight: 600,
-              color,
+              color: "var(--text)",
               background: "transparent",
               border: "none",
               outline: "none",

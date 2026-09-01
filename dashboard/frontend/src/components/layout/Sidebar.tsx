@@ -110,27 +110,13 @@ export function Sidebar({ activePage, onNavigate, isDark, setIsDark }: SidebarPr
           style={{
             width: 32,
             height: 32,
-            borderRadius: 8,
-            background: "linear-gradient(135deg, #8b5cf6, #6366f1)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
           }}
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="white"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          >
-            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-            <path d="M2 17l10 5 10-5" />
-            <path d="M2 12l10 5 10-5" />
-          </svg>
+          <img src="/logo.png" alt="SentiRate Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
         {!collapsed && (
           <div>

@@ -49,7 +49,7 @@ export function RecentAlerts({ alerts, onNavigateToLogs }: RecentAlertsProps) {
         background: "var(--glass-bg)",
         backdropFilter: "var(--glass-blur)",
         WebkitBackdropFilter: "var(--glass-blur)",
-        border: "1px solid var(--glass-border)",
+        border: "2px solid var(--glass-border)",
         borderRadius: "var(--radius)",
         boxShadow: "var(--card-shadow)",
         padding: 24,
