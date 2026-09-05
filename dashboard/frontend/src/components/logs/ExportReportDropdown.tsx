@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import type { LogEntry } from "../../types";
+import type { LogEntry, StatCardData } from "../../types";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-export function ExportReportDropdown({ entries }: { entries: LogEntry[] }) {
+export function ExportReportDropdown({ entries, stats, analytics }: { entries: LogEntry[], stats: StatCardData[], analytics: any }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -30,6 +30,16 @@ export function ExportReportDropdown({ entries }: { entries: LogEntry[] }) {
       `"Allowed Traffic",${allowed},${pct(allowed)}%`,
       `"Throttled Bursts",${throttled},${pct(throttled)}%`,
       `"Blocked Threats",${blocked},${pct(blocked)}%`,
+      `""`,
+      `"PERFORMANCE METRICS"`,
+      `"System Throughput",${stats.find(s => s.label === "System Throughput")?.value || "0"} req/s`,
+      `"Internal Latency (Avg)",${stats.find(s => s.label === "Request Latency")?.value || "0"} ms`,
+      `"Internal Latency (p95 Peak)",${stats.find(s => s.label === "Request Latency")?.delta || "N/A"}`,
+      `""`,
+      `"CLASSIFICATION ACCURACY"`,
+      `"False Positive Rate (FPR)",${analytics?.fpr !== null ? analytics.fpr + "%" : "N/A"}`,
+      `"False Negative Rate (FNR)",${analytics?.fnr !== null ? analytics.fnr + "%" : "N/A"}`,
+      `"Request Acceptance Rate (RAR)",${analytics?.tnr !== null ? analytics.tnr + "%" : "N/A"}`,
       `""`,
     ];
 
@@ -135,6 +145,30 @@ export function ExportReportDropdown({ entries }: { entries: LogEntry[] }) {
         br: [254, 202, 202], bg: [254, 242, 242], t1: [220, 38, 38], t2: [185, 28, 28]
     });
 
+    // --- Performance & Accuracy ---
+    doc.setFontSize(12);
+    doc.setTextColor(20, 20, 30);
+    doc.setFont("helvetica", "bold");
+    doc.text("System Performance & Accuracy", 14, 62);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    
+    const throughput = stats.find(s => s.label === "System Throughput")?.value || "0";
+    const latencyAvg = stats.find(s => s.label === "Request Latency")?.value || "0";
+    const latencyPeak = stats.find(s => s.label === "Request Latency")?.delta || "N/A";
+    
+    doc.text(`Throughput: ${throughput} req/s`, 14, 68);
+    doc.text(`Internal Latency: ${latencyAvg} ms avg (${latencyPeak})`, 80, 68);
+
+    const fpr = analytics?.fpr !== null ? analytics.fpr + "%" : "N/A";
+    const fnr = analytics?.fnr !== null ? analytics.fnr + "%" : "N/A";
+    const rar = analytics?.tnr !== null ? analytics.tnr + "%" : "N/A";
+
+    doc.text(`FPR (False Positive Rate): ${fpr}`, 14, 74);
+    doc.text(`FNR (False Negative Rate): ${fnr}`, 80, 74);
+    doc.text(`RAR (Request Acceptance): ${rar}`, 150, 74);
+
     const headers = [
       "Timestamp",
       "IP Address",
@@ -164,7 +198,7 @@ export function ExportReportDropdown({ entries }: { entries: LogEntry[] }) {
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: 60,
+      startY: 82,
       theme: 'grid',
       headStyles: { fillColor: [44, 44, 60] },
       styles: { fontSize: 8 },

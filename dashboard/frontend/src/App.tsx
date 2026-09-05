@@ -440,7 +440,7 @@ export default function App() {
               onNavigateToLogs={handleNavigateToLogs}
             />
           )}
-          {page === "logs" && <TrafficLogs entries={logs} initialSearch={logsSearch} highlightIp={logsHighlight} />}
+          {page === "logs" && <TrafficLogs entries={logs} stats={stats} analytics={analytics} initialSearch={logsSearch} highlightIp={logsHighlight} />}
           {page === "configuration" && <Configuration />}
         </main>
       </div>

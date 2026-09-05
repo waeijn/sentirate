@@ -2,15 +2,23 @@ import { useState } from "react";
 import { LogsTable } from "../components/logs/LogsTable";
 import { RequestExplanationPanel } from "../components/logs/RequestExplanationPanel";
 import { ExportReportDropdown } from "../components/logs/ExportReportDropdown";
-import type { LogEntry } from "../types";
+import type { LogEntry, StatCardData } from "../types";
 
 interface TrafficLogsProps {
   entries: LogEntry[];
+  stats: StatCardData[];
+  analytics: {
+    fpr: number | null;
+    fnr: number | null;
+    tpr: number | null;
+    tnr: number | null;
+    accuracy: number | null;
+  };
   initialSearch?: string;
   highlightIp?: string;
 }
 
-export function TrafficLogs({ entries, initialSearch, highlightIp }: TrafficLogsProps) {
+export function TrafficLogs({ entries, stats, analytics, initialSearch, highlightIp }: TrafficLogsProps) {
   const [selected, setSelected] = useState<LogEntry | null>(null);
 
   return (
@@ -45,7 +53,7 @@ export function TrafficLogs({ entries, initialSearch, highlightIp }: TrafficLogs
               were taken
             </p>
           </div>
-          <ExportReportDropdown entries={entries} />
+          <ExportReportDropdown entries={entries} stats={stats} analytics={analytics} />
         </div>
 
         <LogsTable
