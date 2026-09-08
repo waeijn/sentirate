@@ -200,6 +200,7 @@ CUSTOM_UI_JS = """
             { value: 'normal',     label: 'Normal Traffic' },
             { value: 'bursty',     label: 'Bursty Legitimate' },
             { value: 'suspicious', label: 'Suspicious / Abusive' },
+            { value: 'baseline',   label: 'Baseline (Raw Throughput)' },
         ], function() {
             setReactValue(input, this.value);
         });
@@ -265,19 +266,24 @@ def on_locust_init(environment, **kw):
 @events.test_start.add_listener
 def filter_by_profile(environment, **kwargs):
     profile = environment.parsed_options.traffic_profile.strip().lower()
-    profile_map = {
-        "normal": NormalUser,
-        "bursty": BurstyUser,
-        "suspicious": SuspiciousUser,
-    }
-
-    if profile in profile_map:
-        environment.user_classes = [profile_map[profile]]
-        print(f"\n>>> Profile filter active: running ONLY {profile_map[profile].__name__}\n")
+    if profile == "normal":
+        environment.user_classes = [NormalUser]
+        print("\n>>> Profile filter active: running ONLY NormalUser\n")
+    elif profile == "bursty":
+        environment.user_classes = [BurstyUser]
+        print("\n>>> Profile filter active: running ONLY BurstyUser\n")
+    elif profile == "suspicious":
+        environment.user_classes = [SuspiciousUser]
+        print("\n>>> Profile filter active: running ONLY SuspiciousUser\n")
+    elif profile == "baseline":
+        environment.user_classes = [BaselineUser]
+        print("\n>>> Profile filter active: running BASELINE\n")
     elif profile == "":
-        print("\n>>> No profile specified — running MIXED (all three, weighted)\n")
+        environment.user_classes = [NormalUser, BurstyUser, SuspiciousUser]
+        print("\n>>> No profile specified - running MIXED (all three, weighted)\n")
     else:
-        print(f"\n>>> WARNING: unknown profile '{profile}' — running MIXED (all three, weighted)\n")
+        environment.user_classes = [NormalUser, BurstyUser, SuspiciousUser]
+        print(f"\n>>> WARNING: unknown profile '{profile}' - running MIXED (all three, weighted)\n")
 
 
 # ── Thread-safe unique IP per user (Distributed-Safe) ───────────────
@@ -438,8 +444,34 @@ class SuspiciousUser(HttpUser):
             elif response.status_code == 200:
                 response.failure("Suspicious traffic admitted (FN)")
 
+# ── Scenario 4: Raw Baseline Throughput ──────────────────────────────────
 
-# ── Event hooks ───────────────────────────────────────────────────────────────
+class BaselineUser(HttpUser):
+    """
+    Hits the raw_request endpoint completely bypassing the rate limiter.
+    Uses human_wait so that 100 users generate ~100 RPS, allowing direct
+    A/B comparison against the middleware at the exact same load levels.
+    """
+    wait_time = human_wait
+    weight    = 1
+
+    def on_start(self):
+        self.spoofed_ip = _next_ip("normal")
+
+    @task
+    def api_call(self):
+        with self.client.post(
+            f"/api/raw_request/{self.spoofed_ip}",
+            headers={"X-Forwarded-For": self.spoofed_ip},
+            name="/api/raw_request [baseline]",
+            catch_response=True,
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Server Error: {response.status_code}")
+
+# ── Event hooks ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 @events.test_start.add_listener
 def on_test_start(environment, **kwargs):
