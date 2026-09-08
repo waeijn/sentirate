@@ -125,43 +125,17 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
     @router.post("/request/{client_ip}")
     async def process_request(client_ip: str, endpoint: str = "/api/data"):
         """
-        Runs one request through the full rate-limiting pipeline.
-        Returns HTTP 200 if admitted, HTTP 429 if blocked.
-        This is the endpoint Locust hits during the stress test.
+        RAW BASELINE MODE: Middleware bypassed.
+        Always returns HTTP 200 immediately to measure absolute maximum server throughput.
         """
-        result = await limiter.process_request(               # ← await + renamed
-            ip       = client_ip,
-            endpoint = endpoint,
-            method   = "POST",
-        )
- 
-        if result["decision"] == "BLOCKED":
-            return JSONResponse(
-                status_code = 429,
-                headers     = {
-                    "Retry-After":           str(result["bucket"]["seconds_until_token"]),
-                    "X-RateLimit-Class":     result["traffic_type"],
-                    "X-RateLimit-Remaining": str(result["bucket"]["current_tokens"]),
-                },
-                content = {
-                    "error":          "Rate limit exceeded",
-                    "decision":       "BLOCKED",
-                    "classification": result["traffic_type"],
-                    "justification":  result["justification"],
-                    "retry_after":    result["bucket"]["seconds_until_token"],
-                    "markers":        result["markers"],
-                    "bucket":         result["bucket"],
-                },
-            )
- 
         return {
             "decision":       "ADMITTED",
-            "classification": result["traffic_type"],
-            "justification":  result["justification"],
-            "markers":        result["markers"],
-            "bucket":         result["bucket"],
-            "risk_score":     result["risk_score"],
-            "monitor_totals": result["monitor_totals"],
+            "classification": "raw_baseline",
+            "justification":  "Rate limiter bypassed for benchmarking",
+            "markers":        {},
+            "bucket":         {},
+            "risk_score":     0.0,
+            "monitor_totals": {},
         }
 
     # ── Configuration (Chapter 3 Table 2 + Table 3 values) ───────────────────
