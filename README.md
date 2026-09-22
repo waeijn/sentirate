@@ -5,7 +5,7 @@
 ![SentiRate Logo](dashboard/frontend/public/logo.png)
 
 ## Project Overview
-This repository contains **SentiRate**, a lightweight Application Programming Interface (API) middleware designed to provide adaptive security for Micro, Small, and Medium Enterprises (MSMEs). 
+This repository contains **SentiRate**, a lightweight Application Programming Interface (API) middleware designed to provide adaptive security for organizations that operate an API architecture. 
 
 The system addresses the gap in traditional static rate limiting by utilizing **Heuristic Pattern Classification** to distinguish between human-like and robotic traffic patterns in real-time. By dynamically optimizing **Token Bucket** parameters, the middleware ensures high service availability for legitimate users while instantly mitigating automated abuse (e.g., volumetric attacks, web scrapers) with minimal processing delay.
 
