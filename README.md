@@ -56,7 +56,7 @@ npm run dev -- --host 0.0.0.0
 ```
 *The dashboard will be available at `http://localhost:5173`.*
 
-> **💡 Windows Users:** You can optionally run the `start_all.ps1` script in the root directory to automatically launch the Redis container, the FastAPI backend, and the React frontend simultaneously in separate windows.
+> **Note for Windows Users:** You can optionally run the `start_all.ps1` script in the root directory to automatically launch the Redis container, the FastAPI backend, and the React frontend simultaneously in separate windows.
 
 ---
 
