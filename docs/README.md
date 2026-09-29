@@ -16,5 +16,9 @@ This folder contains the technical documentation and reference material for the 
 * **[04. Evaluation Methodology](./04_evaluation_methodology.md)**
   Provides the guidelines for executing synthetic load tests using Locust, including the modeling of Human-Computer Interaction (HCI) and Single-Page Application (SPA) burst patterns.
 
+## Live Defense Guides
+* **[Target PC Guide](./demo_guides/demo_target_guide.md)** - Instructions for hosting the system (Redis, Backend, Dashboard) during a live local network demonstration.
+* **[Attacker PC Guide](./demo_guides/demo_attacker_guide.md)** - Instructions for firing Locust traffic across the Wi-Fi network at the Target PC.
+
 ## Diagrams
 * **[diagrams/](./diagrams/)** - Directory reserved for storing architecture flowcharts, state transition diagrams, and sequence diagrams.
