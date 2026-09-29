@@ -38,7 +38,7 @@ ERROR_RATE_THRESHOLD = 0.40
 
 # ── Commercial-Grade FNR Countermeasures ─────────────────────────────────
 PENALTY_COOLDOWN_S    = 60      # Sticky penalty: bots stay locked for 60s
-MICROBURST_THRESHOLD_S = 0.015  # Tripwire: Δt < 15ms = instant suspicious
+MICROBURST_THRESHOLD_S = 0.035  # Tripwire: Δt < 15ms = instant suspicious
                                 # Lowered from 35ms to account for event loop jitter
 
 # ── Dynamic Configuration Thresholds ───────────────────────────────────────
@@ -244,7 +244,11 @@ class AdaptiveRateLimiter:
         else:
             decision = "THROTTLED"
         capacity, refill_rate = BUCKET_PROFILES[classification.value]
-        retry       = round(1.0 / refill_rate, 3) if refill_rate > 0 else 999
+        retry       = round(1.0 / refill_rate, 3) if refill_rate > 0 else PENALTY_COOLDOWN_S
+
+        log_decision = "BLOCKED HTTP 429" if decision == "BLOCKED" else decision
+        display_tokens = tokens_left + 1.0 if decision == "ADMITTED" else tokens_left
+        logger.info(f"router | ip={ip:<15} class={classification.value:<10} tokens={display_tokens:.2f} → {log_decision}")
 
         latency_ms = (time.perf_counter() - start_perf) * 1000
 
@@ -351,14 +355,14 @@ class AdaptiveRateLimiter:
             # If the two most recent requests arrived < 15ms apart,
             # no human can click that fast — instant suspicious.
             # This fires BEFORE we even compute σ or λ.
-            # DISABLED: Event loop jitter under load triggers this falsely.
-            # if len(timestamps) >= 2:
-            #     delta = timestamps[-1] - timestamps[-2]
-            #     if delta < MICROBURST_THRESHOLD_S:
-            #         span = timestamps[-1] - timestamps[0]
-            #         effective_span = max(span, 0.001)
-            #         lam = len(timestamps) / effective_span
-            #         return TrafficClass.SUSPICIOUS, lam, 0.0, 0.0, 0.0
+            if len(timestamps) >= 2:
+                delta = timestamps[-1] - timestamps[-2]
+                if delta < MICROBURST_THRESHOLD_S:
+                    span = timestamps[-1] - timestamps[0]
+                    effective_span = max(span, 0.001)
+                    lam = len(timestamps) / effective_span
+                    logger.warning(f"heuristic | ip={ip:<15} Δt={delta * 1000:.0f}ms → MICRO-BURST TRIPWIRE TRIGGERED")
+                    return TrafficClass.SUSPICIOUS, lam, 0.0, 0.0, 0.0
 
             span = timestamps[-1] - timestamps[0]
             # Use max(span, 1.0) to prevent artificial spikes for brand new users.
@@ -467,10 +471,7 @@ class AdaptiveRateLimiter:
                     # Refresh the timer because they are still sending traffic!
                     await self._redis.set(penalty_key, "1", ex=PENALTY_COOLDOWN_S)
 
-            logger.debug(
-                "[CLI LOG] IP: %-15s | Eval → Class: %-10s | λ: %6.2f req/s | σ: %.4fs | BurstFreq: %5.1f/min | Persist: %5.1fs",
-                ip, new_class.value.upper(), lam, sigma, burst_rate_per_min, persistence
-            )
+            print(f"heuristic | ip={ip:<15} λ={lam:.1f} σ={sigma:.2f} burst/min={burst_rate_per_min:.0f} persist={persistence:.0f}s → {new_class.value}")
 
             # 3. State update & Websocket emit if class changed
             if new_class != current_class:
@@ -540,7 +541,7 @@ class AdaptiveRateLimiter:
                     "current_tokens":      round(tokens_left, 2),
                     "capacity":            cap,
                     "refill_rate":         rfill,
-                    "seconds_until_token": round(1.0 / rfill, 3) if rfill > 0 else 999,
+                    "seconds_until_token": round(1.0 / rfill, 3) if rfill > 0 else PENALTY_COOLDOWN_S,
                 },
                 "endpoint": endpoint,
             })
@@ -715,7 +716,7 @@ class AdaptiveRateLimiter:
                     "current_tokens":      round(tokens, 2),
                     "capacity":            cap,
                     "refill_rate":         rfill,
-                    "seconds_until_token": round(1.0 / rfill, 3) if rfill > 0 else 999,
+                    "seconds_until_token": round(1.0 / rfill, 3) if rfill > 0 else PENALTY_COOLDOWN_S,
                 },
                 "last_seen": float(state.get("last_seen", 0)),
             })
