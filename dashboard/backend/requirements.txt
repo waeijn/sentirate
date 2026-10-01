@@ -1,0 +1,8 @@
+﻿fastapi
+uvicorn[standard]
+python-socketio
+python-dotenv
+pydantic
+httpx
+aiofiles
+python-multipart

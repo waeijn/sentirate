@@ -1,0 +1,13 @@
+Method,Name,Error,Occurrences
+POST,/api/request [bursty],"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",19
+POST,/api/request [suspicious],CatchResponseError('Suspicious traffic admitted (FN)'),192
+POST,/api/request [bursty],"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",136
+POST,/api/request [suspicious],"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",73
+GET,/api/metrics [normal],"ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)",1
+GET,/api/metrics [normal],"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",4
+GET,/api/metrics [normal],"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",62
+POST,/api/request [normal],"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",20
+POST,/api/request [suspicious],"ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)",1
+POST,/api/request [normal],"ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)",4
+POST,/api/request [bursty],"ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)",1
+POST,/api/request [normal],"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",157

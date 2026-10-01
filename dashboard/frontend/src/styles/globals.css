@@ -1,0 +1,212 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+
+/* ── Dark mode (default) — Apple HIG inspired ────────────────────────────── */
+:root {
+  --bg: #09090b;
+  --bg-elevated: #18181b;
+  --bg-panel: #18181b;
+  --bg-hover: #27272a;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.12);
+
+  --normal: #10b981;
+  --normal-dim: rgba(16, 185, 129, 0.12);
+  --normal-glow: rgba(16, 185, 129, 0.15);
+  --bursty: #f59e0b;
+  --bursty-dim: rgba(245, 158, 11, 0.12);
+  --bursty-glow: rgba(245, 158, 11, 0.15);
+  --suspicious: #e11d48;
+  --suspicious-dim: rgba(225, 29, 72, 0.12);
+  --suspicious-glow: rgba(225, 29, 72, 0.15);
+
+  --accent: #6366f1;
+  --accent-2: #8b5cf6;
+  --accent-dim: rgba(99, 102, 241, 0.12);
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --accent-grad: linear-gradient(135deg, #8b5cf6, #6366f1);
+
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", monospace;
+
+  --radius: 20px;
+  --radius-sm: 12px;
+  --sidebar-w: 220px;
+
+  /* Dark mode: no shadows, use glass instead, or specific glow */
+  --shadow-sm: none;
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --card-shadow: 0 8px 32px var(--card-glow, rgba(0,0,0,0.3));
+
+  /* Glassmorphism tokens */
+  --glass-bg: rgba(24, 24, 27, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: blur(24px) saturate(180%);
+}
+
+/* ── Light mode — Apple HIG inspired ─────────────────────────────────────── */
+:root.light {
+  --bg: #f9fafb;
+  --bg-elevated: #ffffff;
+  --bg-panel: #ffffff;
+  --bg-hover: #f3f4f6;
+  --border: rgba(0, 0, 0, 0.25);
+  --border-light: rgba(0, 0, 0, 0.3);
+
+  --normal: #10b981;
+  --normal-dim: rgba(16, 185, 129, 0.12);
+  --normal-glow: rgba(16, 185, 129, 0.15);
+  --bursty: #f59e0b;
+  --bursty-dim: rgba(245, 158, 11, 0.12);
+  --bursty-glow: rgba(245, 158, 11, 0.15);
+  --suspicious: #e11d48;
+  --suspicious-dim: rgba(225, 29, 72, 0.12);
+  --suspicious-glow: rgba(225, 29, 72, 0.15);
+
+  --accent: #6366f1;
+  --accent-2: #8b5cf6;
+  --accent-dim: rgba(99, 102, 241, 0.12);
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --accent-grad: linear-gradient(135deg, #8b5cf6, #6366f1);
+
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-dim: #475569;
+
+  /* Light mode: delicate multi-layered ambient shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.02), 0 10px 24px rgba(0, 0, 0, 0.06);
+  --card-shadow: var(--shadow-md);
+
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.4);
+  --glass-blur: blur(24px) saturate(180%);
+}
+
+/* ── Reset ────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01", "tnum";
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: "opsz" 20;
+  transition:
+    background 0.3s ease,
+    color 0.3s ease;
+}
+
+/* ── Glass panel utility ─────────────────────────────────────────────────── */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+
+/* In light mode, glass panels become opaque white with shadow */
+:root.light .glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--text-dim);
+  border-radius: 3px;
+  opacity: 0.5;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes spin-once {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(180deg);
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.3s ease both;
+}
+
+/* ── Base element styles ──────────────────────────────────────────────────── */
+button {
+  cursor: pointer;
+  font-family: var(--font-display);
+}
+input,
+select {
+  font-family: var(--font-display);
+}
+
+/* ── Grid background — disabled ──────────────────────────────────────────── */
+.grid-bg {
+  background-image: none;
+}
