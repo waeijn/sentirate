@@ -25,7 +25,7 @@ docker start rate-limiter-redis
 ### Window 2: Start Backend Middleware (FastAPI)
 ```bash
 # Navigate to the backend folder
-cd ~/adaptive-api-rate-limiter/dashboard/backend
+cd ~/sentirate/dashboard/backend
 
 # Activate the virtual environment
 source venv/bin/activate
@@ -38,7 +38,7 @@ DASHBOARD_HOST=0.0.0.0 DASHBOARD_PORT=8050 python main.py
 ### Window 3: Start Frontend Dashboard (React)
 ```bash
 # Navigate to the frontend folder
-cd ~/adaptive-api-rate-limiter/dashboard/frontend
+cd ~/sentirate/dashboard/frontend
 
 # Start the Vite development server (Binding to 0.0.0.0)
 npm run dev -- --host 0.0.0.0

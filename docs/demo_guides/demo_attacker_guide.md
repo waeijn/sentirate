@@ -13,7 +13,7 @@ The Attacker VM does not need to run Docker, the backend, or the dashboard. It o
 ## 1. Navigate to the Workspace
 Open your terminal and navigate to the traffic generation directory:
 ```bash
-cd ~/adaptive-api-rate-limiter/experiments/traffic_generation
+cd ~/sentirate/experiments/traffic_generation
 ```
 
 ---
