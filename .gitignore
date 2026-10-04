@@ -1,3 +1,9 @@
+# Project-specific ignores
+/package.json
+/package-lock.json
+dashboard/backend/requirements.txt
+docs/diagrams/.gitkeep
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
