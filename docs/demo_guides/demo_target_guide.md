@@ -17,9 +17,11 @@ You can start all services simultaneously using the automated PowerShell script.
 
 1. Open PowerShell in the project root directory.
 2. Run the script:
+
    ```powershell
    .\start_all.ps1
    ```
+
    _(This script uses relative paths and will automatically open separate windows for Redis, the Backend, and the Frontend)._
 
 ---
