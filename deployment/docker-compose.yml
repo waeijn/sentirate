@@ -1,41 +1,36 @@
 version: "3.8"
 
 services:
-  core:
+  target-server:
     build:
-      context: ../..
-      dockerfile: deployment/docker/Dockerfile.core
+      context: ..
+      dockerfile: deployment/Dockerfile.target
     ports:
       - "8000:8000"
-    environment:
-      - PYTHON_ENV=development
-      - LOG_LEVEL=INFO
-    volumes:
-      - ../../src:/app/src
-      - ../../data/logs:/app/data/logs
 
-  dashboard-backend:
+  backend:
     build:
-      context: ../../dashboard/backend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: deployment/Dockerfile.backend
     ports:
       - "8050:8050"
     environment:
       - DASHBOARD_HOST=0.0.0.0
       - DASHBOARD_PORT=8050
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - core
+      - redis
 
-  dashboard-frontend:
+  frontend:
     build:
-      context: ../../dashboard/frontend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: deployment/Dockerfile.frontend
     ports:
       - "5173:5173"
     environment:
       - VITE_API_URL=http://localhost:8050
     depends_on:
-      - dashboard-backend
+      - backend
 
   redis:
     image: redis:7-alpine
@@ -45,7 +40,7 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
-      - ../../dashboard/backend/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ../dashboard/backend/redis.conf:/usr/local/etc/redis/redis.conf:ro
     command: redis-server /usr/local/etc/redis/redis.conf
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
