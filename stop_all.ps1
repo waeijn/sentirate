@@ -15,7 +15,8 @@ function Kill-ProcessByPort {
     if ($connection) {
         $pidToKill = $connection.OwningProcess
         Write-Host "Stopping $ServiceName (Port $Port, PID $pidToKill)..." -ForegroundColor Yellow
-        Stop-Process -Id $pidToKill -Force -ErrorAction SilentlyContinue
+        # Use taskkill /T to kill the process tree (parent and all child workers)
+        taskkill /F /PID $pidToKill /T | Out-Null
         Write-Host "$ServiceName stopped." -ForegroundColor Green
     } else {
         Write-Host "$ServiceName is not running on port $Port." -ForegroundColor DarkGray
