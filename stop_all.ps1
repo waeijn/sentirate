@@ -22,7 +22,10 @@ function Kill-ProcessByPort {
     }
 }
 
-# 2. Stop Backend (Port 8050)
+# 2. Stop Target Server (Port 8000)
+Kill-ProcessByPort -Port 8000 -ServiceName "Target Server"
+
+# 3. Stop Backend (Port 8050)
 Kill-ProcessByPort -Port 8050 -ServiceName "Backend (FastAPI)"
 
 # 3. Stop Frontend (Port 5173)

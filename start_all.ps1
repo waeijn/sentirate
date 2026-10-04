@@ -18,7 +18,11 @@ if ($container) {
     docker run -d --name rate-limiter-redis -p 6379:6379 redis:alpine | Out-Null
 }
 
-# 2. Middleware (Backend API)
+# 2. Target Server (Mock Upstream on Port 8000)
+Write-Host "Starting Target Server..." -ForegroundColor Yellow
+Start-Process powershell -ArgumentList '-Command', "cd `"$PSScriptRoot\target_server`"; poetry run uvicorn main:app --port 8000"
+
+# 3. Middleware (Backend API on Port 8050)
 Start-Process powershell -ArgumentList '-Command', "cd `"$PSScriptRoot\dashboard\backend`"; poetry run python main.py"
 
 # 3. Frontend (React UI)
