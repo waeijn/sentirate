@@ -19,14 +19,14 @@ if ($container) {
 }
 
 # 2. Middleware (Backend API)
-Start-Process powershell -ArgumentList '-NoExit', '-Command', "cd `"$PSScriptRoot\dashboard\backend`"; poetry run python main.py"
+Start-Process powershell -ArgumentList '-Command', "cd `"$PSScriptRoot\dashboard\backend`"; poetry run python main.py"
 
 # 3. Frontend (React UI)
-Start-Process powershell -ArgumentList '-NoExit', '-Command', "cd `"$PSScriptRoot\dashboard\frontend`"; npm run dev"
+Start-Process powershell -ArgumentList '-Command', "cd `"$PSScriptRoot\dashboard\frontend`"; npm run dev"
 
 # 4. Traffic Generation (Locust)
 Write-Host "Starting Locust Traffic Generator..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList '-NoExit', '-Command', "cd `"$PSScriptRoot\experiments\traffic_generation\locust_scripts`"; poetry run locust -f locust_scenarios.py --host=http://localhost:8050"
+Start-Process powershell -ArgumentList '-Command', "cd `"$PSScriptRoot\experiments\traffic_generation\locust_scripts`"; poetry run locust -f locust_scenarios.py --host=http://localhost:8050"
 
 # Wait for backend and Locust to be ready
 Start-Sleep -Seconds 6
@@ -35,8 +35,7 @@ Write-Host ""
 Write-Host "All services starting." -ForegroundColor Green
 Write-Host "Opening web browsers..." -ForegroundColor Cyan
 
-# Automatically open the web apps in the default browser
-Start-Process "http://localhost:5173" # Dashboard
+# Automatically open the Locust UI (Vite automatically opens the Dashboard)
 Start-Process "http://localhost:8089" # Locust UI
 
 Write-Host ""
