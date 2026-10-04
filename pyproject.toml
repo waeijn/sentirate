@@ -10,7 +10,7 @@ authors = [
 ]
 readme = "README.md"
 license = "MIT"
-packages = [{include = "src"}]
+
 
 [tool.poetry.dependencies]
 python = "^3.11"
