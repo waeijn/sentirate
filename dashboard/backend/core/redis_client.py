@@ -10,7 +10,7 @@ Usage:
     await redis_client.initialise("redis://localhost:6379/0")
 
     # Anywhere else:
-    from redis_client import get_redis
+    from core.redis_client import get_redis
     redis = get_redis()
     await redis.get("some-key")
 """

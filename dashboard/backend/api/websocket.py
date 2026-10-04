@@ -19,8 +19,8 @@ import asyncio
 import logging
 import time
 import random
-from middleware import AdaptiveRateLimiter
-from heuristic_engine import TrafficType
+from core.middleware import AdaptiveRateLimiter
+from algorithms.heuristic_engine import TrafficType
 
 logger = logging.getLogger("websocket")
 START_TIME = time.time()

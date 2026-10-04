@@ -13,7 +13,7 @@ LogEntry is expanded to match the frontend LiveEvent interface exactly:
 
 import time
 from dataclasses import dataclass, field
-from heuristic_engine import TrafficType, TrafficMonitor
+from algorithms.heuristic_engine import TrafficType, TrafficMonitor
 
 
 # =============================================================================
@@ -256,7 +256,7 @@ class FeedbackProvider:
 # =============================================================================
 
 def _build_matched_rules(traffic_type: TrafficType, markers: dict) -> list:
-    from heuristic_engine import (
+    from algorithms.heuristic_engine import (
         NORMAL_RATE_MAX, BURSTY_RATE_MAX,
         SUSPICIOUS_SIGMA, SUSPICIOUS_BURST, SUSPICIOUS_PERSIST,
         BURSTY_BURST_MIN, BURSTY_PERSIST_MIN,

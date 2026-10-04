@@ -17,8 +17,8 @@ from typing import Optional
 
 import redis.asyncio as aioredis
 from redis.exceptions import NoScriptError
-from heuristic_worker import HeuristicTaskQueue
-from metrics_accumulator import MetricsAccumulator
+from algorithms.heuristic_worker import HeuristicTaskQueue
+from monitoring.metrics_accumulator import MetricsAccumulator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -166,7 +166,7 @@ class AdaptiveRateLimiter:
 
     @property
     def _redis(self) -> aioredis.Redis:
-        import redis_client as rc
+        import core.redis_client as rc
         return rc.get_redis()
 
     def _k(self, ip: str, suffix: str) -> str:
@@ -340,7 +340,7 @@ class AdaptiveRateLimiter:
         ip: str
     ) -> tuple[TrafficClass, float, float, float, float]:
         import math
-        from middleware import AdaptiveRateLimiter
+        from core.middleware import AdaptiveRateLimiter
 
         lam, sigma, burst_rate_per_min, persistence = 0.0, 0.0, 0.0, 0.0
         new_class = current_class

@@ -27,9 +27,9 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from middleware import AdaptiveRateLimiter
-import heuristic_engine
-from heuristic_engine import (
+from core.middleware import AdaptiveRateLimiter
+from algorithms import heuristic_engine
+from algorithms.heuristic_engine import (
     TrafficType,
     PROFILES,
     NORMAL_RATE_MAX,
@@ -171,7 +171,7 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
         """
         Returns the current threshold and token bucket profile configuration.
         """
-        import middleware
+        from core import middleware
         return {
             "thresholds": {
                 "normal_rate_max":    middleware.NORMAL_RATE_MAX,
@@ -195,7 +195,7 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
         """
         Dynamically applies updated thresholds and token bucket profiles.
         """
-        import middleware
+        from core import middleware
         
         if not (config.suspicious_refill < config.normal_refill < config.bursty_refill):
             return JSONResponse(
