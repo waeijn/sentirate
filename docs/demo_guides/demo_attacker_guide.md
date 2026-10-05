@@ -1,68 +1,61 @@
-# Live Defense Guide: Attacker PC
+# Live Defense Guide: Attacker VM (Kali Linux)
 
-This guide is for the **Attacker Machine** during a two-device physical network demonstration.
-The Attacker PC does not need to run Docker, the backend, or the dashboard. It only generates traffic.
+This guide is for the **Attacker Virtual Machine** during a simulated network demonstration. 
+The Attacker VM does not need to run Docker, the backend, or the dashboard. It only generates traffic.
 
 ## Prerequisites
-
-1. Ensure both the Attacker PC and Target PC are connected to the **exact same Wi-Fi network**.
-2. Ask the Lead Programmer (Target PC) for their IPv4 Address (e.g., `192.168.1.50`).
-3. Open this file in an editor (like VSCode or Notepad), press `Ctrl + H` (Find and Replace), and replace `YOUR_TARGET_IP` with their actual IP address.
+1. Ensure both the Attacker VM and Target VM are on the same virtual network (e.g., Host-Only Adapter or Bridged Network in VirtualBox/VMware).
+2. Ask the Lead Programmer (Target VM) for their IPv4 Address (e.g., `192.168.56.101`).
+3. Open this file in an editor, press `Ctrl + H` (Find and Replace), and replace `YOUR_TARGET_IP` with their actual IP address.
 
 ---
 
 ## 1. Navigate to the Workspace
-
-Open PowerShell and navigate to the traffic generation directory:
-
-```powershell
-cd experiments\traffic_generation
+Open your terminal and navigate to the traffic generation directory:
+```bash
+cd ~/sentirate/experiments/traffic_generation
 ```
 
 ---
 
 ## 2. Run Isolated Normal Traffic
-
-```powershell
+```bash
 # Step A: Reset the Target's backend memory
-curl.exe -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
 
 # Step B: Run Normal profile (3 minutes, 250 users)
-poetry run locust -f locust_scripts\locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m NormalUser
+locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m NormalUser
 ```
 
 ---
 
 ## 3. Run Isolated Bursty Traffic
-
-```powershell
+```bash
 # Step A: Reset backend memory
-curl.exe -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
 
 # Step B: Run Bursty profile (3 minutes, 250 users)
-poetry run locust -f locust_scripts\locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m BurstyUser
+locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m BurstyUser
 ```
 
 ---
 
 ## 4. Run Volumetric Attack (Suspicious)
-
-```powershell
+```bash
 # Step A: Reset backend memory
-curl.exe -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
 
 # Step B: Run Suspicious profile (3 minutes, 250 users)
-poetry run locust -f locust_scripts\locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m SuspiciousUser
+locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m SuspiciousUser
 ```
 
 ---
 
 ## 5. Run Mixed Trial (All Profiles Concurrently)
-
-```powershell
+```bash
 # Step A: Reset backend memory
-curl.exe -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
 
 # Step B: Run Mixed Traffic simulation (Leaves off profile name to run all)
-poetry run locust -f locust_scripts\locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m
+locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m
 ```
