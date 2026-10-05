@@ -11,7 +11,15 @@ The Target VM is responsible for hosting the Redis Database, the FastAPI Middlew
 
 ## Startup Sequence
 
-You will need to open **three separate terminal windows** to run the services simultaneously.
+**Option A: Automated Startup (If using PowerShell / Windows Host)**
+1. Open PowerShell in the project root directory.
+2. Run the script:
+   ```powershell
+   .\start_all.ps1
+   ```
+   *(This script automatically opens separate windows for Redis, the Target Server, the Backend, and the Frontend).*
+
+**Option B: Manual Startup (If using strict Ubuntu Terminal)**
 
 ### Window 1: Start Redis Database & Open Firewall
 ```bash

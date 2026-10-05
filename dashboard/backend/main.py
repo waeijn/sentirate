@@ -26,8 +26,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import redis_client as rc
-from middleware import AdaptiveRateLimiter
+import core.redis_client as rc
+from core.middleware import AdaptiveRateLimiter
 
 load_dotenv()
 
@@ -108,8 +108,8 @@ app.add_middleware(
 # Same pattern as the original — both modules receive shared_limiter.
 # =============================================================================
 
-from api_routes import create_router
-from websocket_handler import register_socketio_events
+from api.routes import create_router
+from api.websocket import register_socketio_events
 
 app.include_router(
     create_router(shared_limiter),
