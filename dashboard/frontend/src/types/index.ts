@@ -14,7 +14,7 @@ export interface StatCardData {
 }
 
 export interface TrafficPoint {
-  time: string;
+  time: number;
   normal: number;
   bursty: number;
   suspicious: number;

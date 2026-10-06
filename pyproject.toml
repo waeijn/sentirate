@@ -65,7 +65,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --cov=src --cov-report=html --cov-report=term"
+addopts = "-v --cov=dashboard/backend --cov-report=html --cov-report=term"
 
 [tool.black]
 line-length = 100

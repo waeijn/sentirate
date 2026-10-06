@@ -18,7 +18,7 @@ import type {
   AlertSeverity,
 } from "./types";
 
-const BACKEND = "http://localhost:8050";
+const BACKEND = import.meta.env.VITE_API_URL || "http://localhost:8050";
 
 type Page = "monitoring" | "logs" | "configuration";
 
@@ -300,7 +300,7 @@ export default function App() {
           [
             ...prev,
             {
-              time: new Date(parseInt(data.timestamp)).toLocaleTimeString(),
+              time: parseInt(data.timestamp),
               normal: s.classifications.normal,
               bursty: s.classifications.bursty,
               suspicious: s.classifications.suspicious,

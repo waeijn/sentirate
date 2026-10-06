@@ -15,7 +15,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-const BACKEND = "http://localhost:8050";
+const BACKEND = import.meta.env.VITE_API_URL || "http://localhost:8050";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

@@ -210,3 +210,9 @@ select {
 .grid-bg {
   background-image: none;
 }
+
+/* Smooth sliding for chart X-axis labels */
+.recharts-cartesian-axis-tick {
+  transition: transform 2s linear;
+}
+
