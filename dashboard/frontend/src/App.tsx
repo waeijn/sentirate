@@ -18,7 +18,7 @@ import type {
   AlertSeverity,
 } from "./types";
 
-const BACKEND = "http://localhost:8050";
+const BACKEND = import.meta.env.VITE_API_URL || "http://localhost:8050";
 
 type Page = "monitoring" | "logs" | "configuration";
 
