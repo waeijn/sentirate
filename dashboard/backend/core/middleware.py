@@ -790,18 +790,29 @@ class AdaptiveRateLimiter:
         if self._throughput_history and total < self._throughput_history[-1][1]:
             self._throughput_history.clear()
             
-        self._throughput_history.append((now, total))
+        self._throughput_history.append((now, total, normal_total, bursty_total, suspicious_total))
         
         # Remove entries older than 3.0 seconds to keep the window tight
         while self._throughput_history and now - self._throughput_history[0][0] > 3.0:
             self._throughput_history.popleft()
             
         throughput = 0.0
+        rps_normal = 0.0
+        rps_bursty = 0.0
+        rps_suspicious = 0.0
+        
         if len(self._throughput_history) >= 2:
             dt = now - self._throughput_history[0][0]
             if dt > 0.1: # prevent div by zero
-                dreq = total - self._throughput_history[0][1]
-                throughput = round(dreq / dt, 1)
+                old_total = self._throughput_history[0][1]
+                old_normal = self._throughput_history[0][2]
+                old_bursty = self._throughput_history[0][3]
+                old_suspicious = self._throughput_history[0][4]
+                
+                throughput = round(max(0, total - old_total) / dt, 1)
+                rps_normal = round(max(0, normal_total - old_normal) / dt, 1)
+                rps_bursty = round(max(0, bursty_total - old_bursty) / dt, 1)
+                rps_suspicious = round(max(0, suspicious_total - old_suspicious) / dt, 1)
 
         result = {
             "rar":              rar,
@@ -819,6 +830,9 @@ class AdaptiveRateLimiter:
             "suspicious_total": suspicious_total,
             "blocked_total":    int(data.get("blocked_total",   0)),
             "throughput":       throughput,
+            "rps_normal":       rps_normal,
+            "rps_bursty":       rps_bursty,
+            "rps_suspicious":   rps_suspicious,
         }
         self._metrics_cache = result
         self._metrics_cache_time = now

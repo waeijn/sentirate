@@ -131,10 +131,10 @@ async def _build_metrics_payload(limiter: AdaptiveRateLimiter) -> dict:
     # ── Classification breakdown ──────────────────────────────────────────
     cc = metrics.pop("class_counts", {})
     classifications = {
-        "normal":     cc.get("normal", 0) + cc.get("probation", 0),  # probation = unverified normal
-        "bursty":     cc.get("bursty",     0),
-        "suspicious": cc.get("suspicious", 0),
-        "blocked":    cc.get("blocked",    0),
+        "normal":     metrics.get("rps_normal", 0.0),
+        "bursty":     metrics.get("rps_bursty", 0.0),
+        "suspicious": metrics.get("rps_suspicious", 0.0),
+        "blocked":    metrics.get("blocked_total", 0),
     }
 
     active_clients = metrics.get("unique_clients", 0)
