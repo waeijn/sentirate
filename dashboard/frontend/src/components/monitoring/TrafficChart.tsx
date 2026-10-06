@@ -1,3 +1,4 @@
+import { useState, useCallback, useMemo } from "react";
 import {
   AreaChart,
   Area,
@@ -18,6 +19,9 @@ const COLORS = {
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
+  const timeStr = typeof label === "number" 
+    ? new Date(label).toLocaleTimeString([], { hour12: false }) 
+    : label;
   return (
     <div
       style={{
@@ -29,7 +33,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         boxShadow: "var(--card-shadow)",
       }}
     >
-      <div style={{ color: "var(--text-muted)", marginBottom: 6 }}>{label}</div>
+      <div style={{ color: "var(--text-muted)", marginBottom: 6 }}>{timeStr}</div>
       {payload.map((p: any) => (
         <div
           key={p.dataKey}
@@ -118,6 +122,24 @@ function ChartLegend({ percentages }: { percentages: Record<string, number> }) {
 }
 
 export function TrafficChart({ data, uptime = 0 }: { data: TrafficPoint[], uptime?: number }) {
+  const [pinned, setPinned] = useState<{ active: boolean; index?: number; payload?: any; label?: any; coord?: {x: number, y: number} }>({ active: false });
+
+  const handleChartClick = useCallback((state: any) => {
+    if (!state) return;
+    if (pinned.active) {
+      // Unpin on second click
+      setPinned({ active: false });
+    } else if (state.activeTooltipIndex != null) {
+      setPinned({ 
+        active: true, 
+        index: state.activeTooltipIndex,
+        payload: state.activePayload,
+        label: state.activeLabel,
+        coord: state.activeCoordinate
+      });
+    }
+  }, [pinned.active]);
+
   const formatUptime = (seconds: number) => {
     if (seconds == null) return "Live";
     if (seconds < 60) return `Live (${seconds}s)`;
@@ -144,6 +166,19 @@ export function TrafficChart({ data, uptime = 0 }: { data: TrafficPoint[], uptim
     bursty: total ? Math.round((totalBursty / total) * 100) : 0,
     suspicious: total ? Math.round((totalSuspicious / total) * 100) : 0,
   };
+
+  const chartTicks = useMemo(() => {
+    if (data.length < 2) return [];
+    const min = data[0].time;
+    const max = data[data.length - 1].time;
+    const INTERVAL = 10_000; // 10-second snap
+    const firstTick = Math.ceil(min / INTERVAL) * INTERVAL;
+    const result: number[] = [];
+    for (let t = firstTick; t <= max; t += INTERVAL) {
+      result.push(t);
+    }
+    return result;
+  }, [data]);
 
   return (
     <div
@@ -206,9 +241,9 @@ export function TrafficChart({ data, uptime = 0 }: { data: TrafficPoint[], uptim
               <span style={{ color: "var(--accent)", background: "var(--accent-dim)", padding: "2px 8px", borderRadius: 4 }}>
                 {formatUptime(uptime)}
               </span>
-              <span style={{ color: "var(--text-muted)", padding: "2px 4px", cursor: "pointer" }}>15m</span>
-              <span style={{ color: "var(--text-muted)", padding: "2px 4px", cursor: "pointer" }}>30m</span>
-              <span style={{ color: "var(--text-muted)", padding: "2px 4px", cursor: "pointer" }}>1h</span>
+              
+              
+              
             </div>
           </div>
           
@@ -244,10 +279,12 @@ export function TrafficChart({ data, uptime = 0 }: { data: TrafficPoint[], uptim
           Waiting for traffic data...
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={280}>
+        <div style={{ position: "relative", width: "100%", height: 280 }}><ResponsiveContainer width="100%" height={280}>
           <AreaChart
             data={data}
             margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+            onClick={handleChartClick}
+            style={{ cursor: "crosshair" }}
           >
             <defs>
               <linearGradient id="gradNormal" x1="0" y1="0" x2="0" y2="1">
@@ -279,6 +316,10 @@ export function TrafficChart({ data, uptime = 0 }: { data: TrafficPoint[], uptim
             />
             <XAxis
               dataKey="time"
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              ticks={chartTicks}
+              tickFormatter={(unixTime) => new Date(unixTime).toLocaleTimeString([], { hour12: false })}
               tick={{
                 fill: "var(--text-muted)",
                 fontSize: 10,
@@ -286,7 +327,6 @@ export function TrafficChart({ data, uptime = 0 }: { data: TrafficPoint[], uptim
               }}
               tickLine={false}
               axisLine={false}
-              interval="preserveStartEnd"
             />
             <YAxis
               tick={{
@@ -297,7 +337,7 @@ export function TrafficChart({ data, uptime = 0 }: { data: TrafficPoint[], uptim
               tickLine={false}
               axisLine={false}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={!pinned.active ? <CustomTooltip /> : <></>} />
 
             <Area
               type="monotone"
@@ -336,7 +376,7 @@ export function TrafficChart({ data, uptime = 0 }: { data: TrafficPoint[], uptim
               animationEasing="linear"
             />
           </AreaChart>
-        </ResponsiveContainer>
+        </ResponsiveContainer>{pinned.active && pinned.coord && (<div style={{ position: 'absolute', left: pinned.coord.x + 10, top: pinned.coord.y - 20, pointerEvents: 'none', zIndex: 100 }}><div style={{ position: 'absolute', top: -12, left: 12, background: 'var(--accent)', color: 'var(--bg)', fontSize: 10, fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px 4px 0 0', zIndex: 101 }}>PINNED</div><CustomTooltip active={true} payload={pinned.payload} label={pinned.label} /></div>)}</div>
       )}
     </div>
   );

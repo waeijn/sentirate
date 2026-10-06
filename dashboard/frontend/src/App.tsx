@@ -300,7 +300,7 @@ export default function App() {
           [
             ...prev,
             {
-              time: new Date(parseInt(data.timestamp)).toLocaleTimeString(),
+              time: parseInt(data.timestamp),
               normal: s.classifications.normal,
               bursty: s.classifications.bursty,
               suspicious: s.classifications.suspicious,
