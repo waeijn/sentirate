@@ -9,14 +9,13 @@ if ($dockerCheck -match "error during connect") {
     exit
 }
 
-$container = docker ps -a -q -f name="rate-limiter-redis"
+$container = docker ps -a -q -f name="rate-limiter-redis" 2>$null
 if ($container) {
-    Write-Host "Starting existing Redis container..." -ForegroundColor Yellow
-    docker start rate-limiter-redis | Out-Null
-} else {
-    Write-Host "Creating new Redis container..." -ForegroundColor Yellow
-    docker run -d --name rate-limiter-redis -p 6379:6379 redis:alpine | Out-Null
+    Write-Host "Cleaning up previous Redis container..." -ForegroundColor Yellow
+    docker rm -f rate-limiter-redis | Out-Null
 }
+Write-Host "Starting fresh Redis container..." -ForegroundColor Yellow
+docker run -d --rm --name rate-limiter-redis -p 6379:6379 redis:alpine | Out-Null
 
 # 2. Target Server (Mock Upstream on Port 8000)
 Write-Host "Starting Target Server..." -ForegroundColor Yellow
