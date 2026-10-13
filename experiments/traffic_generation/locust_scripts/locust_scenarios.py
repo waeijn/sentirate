@@ -28,6 +28,9 @@ IMPORTANT — before every test run, reset middleware state:
 import time
 import random
 import threading
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from locust import HttpUser, task, between, constant, events
 
@@ -364,6 +367,7 @@ class NormalUser(HttpUser):
     weight    = 3
 
     def on_start(self):
+        self.client.verify = False
         self.spoofed_ip = _next_ip("normal")
 
     @task(9)
@@ -394,6 +398,7 @@ class BurstyUser(HttpUser):
     weight    = 2
 
     def on_start(self):
+        self.client.verify = False
         self.spoofed_ip = _next_ip("bursty")
         self._burst_phase = random.uniform(0, 30)
 
@@ -423,6 +428,7 @@ class SuspiciousUser(HttpUser):
     weight    = 1
 
     def on_start(self):
+        self.client.verify = False
         self.spoofed_ip = _next_ip("suspicious")
 
     @task

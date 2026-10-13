@@ -49,7 +49,10 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 sio = socketio.AsyncServer(
     async_mode           = "asgi",
     client_manager       = socketio.AsyncRedisManager(REDIS_URL),
-    cors_allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174").split(","),
+    cors_allowed_origins = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,https://localhost:5173,http://localhost:5174,https://localhost:5174",
+    ).split(","),
     logger               = False,
     engineio_logger      = False,
 )
@@ -96,7 +99,10 @@ app = FastAPI(
 # CORS — allows the React dashboard (port 5173) to call this backend (port 8050)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174").split(","),
+    allow_origins     = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,https://localhost:5173,http://localhost:5174,https://localhost:5174",
+    ).split(","),
     allow_credentials = True,
     allow_methods     = ["*"],
     allow_headers     = ["*"],
@@ -125,11 +131,14 @@ register_socketio_events(sio, shared_limiter)
 
 @app.get("/")
 async def root():
+    use_https = os.getenv("USE_HTTPS", "false").lower() in ("true", "1", "yes")
+    proto = "https" if use_https else "http"
     return {
         "service":   "Adaptive API Rate Limiting Middleware",
         "version":   "2.0.0",
         "status":    "online",
-        "dashboard": os.getenv("CORS_ORIGINS", "http://localhost:5173"),
+        "protocol":  proto.upper(),
+        "dashboard": os.getenv("CORS_ORIGINS", f"{proto}://localhost:5173"),
         "backend":   os.getenv("CORE_API_URL",  "http://localhost:8000"),
         "docs":      "/docs",
     }
@@ -159,6 +168,33 @@ if __name__ == "__main__":
     host    = os.getenv("DASHBOARD_HOST", "localhost")
     port    = int(os.getenv("DASHBOARD_PORT", 8050))
     workers = int(os.getenv("WORKERS", 10))
+
+    use_https = os.getenv("USE_HTTPS", "false").lower() in ("true", "1", "yes")
+    ssl_kwargs = {}
+
+    if use_https:
+        backend_dir  = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(backend_dir))
+        default_cert = os.path.join(project_root, "certs", "cert.pem")
+        default_key  = os.path.join(project_root, "certs", "key.pem")
+
+        cert_file = os.getenv("SSL_CERTFILE", default_cert)
+        key_file  = os.getenv("SSL_KEYFILE", default_key)
+
+        if os.path.exists(cert_file) and os.path.exists(key_file):
+            logger.info("HTTPS enabled — using SSL cert: %s", cert_file)
+            ssl_kwargs = {
+                "ssl_certfile": cert_file,
+                "ssl_keyfile":  key_file,
+            }
+        else:
+            logger.warning(
+                "USE_HTTPS is true but certificates were not found at %s / %s. Falling back to HTTP.",
+                cert_file, key_file,
+            )
+    else:
+        logger.info("HTTP enabled (USE_HTTPS=false).")
+
     uvicorn.run(
         "main:socket_app",
         host      = host,
@@ -166,4 +202,5 @@ if __name__ == "__main__":
         workers   = workers,
         reload    = False,
         log_level = os.getenv("LOG_LEVEL", "warning").lower(),
+        **ssl_kwargs,
     )
