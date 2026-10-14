@@ -27,14 +27,7 @@ export function Monitoring({
   onNavigateToLogs,
 }: MonitoringProps) {
   return (
-    <div
-      style={{
-        padding: "40px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 32,
-      }}
-    >
+    <div className="page-container">
       {/* Page header */}
       <div>
         <h1
@@ -54,13 +47,7 @@ export function Monitoring({
       </div>
 
       {/* Stat cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 20,
-        }}
-      >
+      <div className="stat-cards-grid">
         {stats.map((s, i) => (
           <div key={i} style={{ animationDelay: `${i * 60}ms`, height: "100%" }}>
             <StatCard
