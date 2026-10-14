@@ -861,14 +861,7 @@ export function Configuration() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div
-      style={{
-        padding: "40px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 32,
-      }}
-    >
+    <div className="page-container">
       {/* Token Bucket panel — hidden in custom mode */}
       {preset.key !== "custom" && (
         <Panel
@@ -954,18 +947,7 @@ export function Configuration() {
         iconChar="◈"
       >
         {/* Preset tabs */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4,1fr)",
-            gap: 6,
-            padding: 6,
-            marginBottom: 14,
-            background: "var(--bg-hover)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
+        <div className="config-presets-grid">
           {PRESETS.map((p) => {
             const active = preset.key === p.key;
             return (
@@ -1161,7 +1143,7 @@ export function Configuration() {
         </div>
 
         {/* Profile cards */}
-        <div style={{ display: "flex", gap: 16 }}>
+        <div className="config-profile-cards-grid">
           {preset.key === "custom" ? (
             <>
               <CustomProfileCard
@@ -1503,19 +1485,7 @@ export function Configuration() {
 
       {/* Action bar */}
       <div
-        className="glass-panel"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "14px 20px",
-          background: "var(--glass-bg)",
-          backdropFilter: "var(--glass-blur)",
-          WebkitBackdropFilter: "var(--glass-blur)",
-          border: "1px solid var(--glass-border)",
-          borderRadius: "var(--radius)",
-          boxShadow: "var(--shadow-md)",
-        }}
+        className="glass-panel action-bar-responsive"
       >
         <span
           style={{
@@ -1529,7 +1499,7 @@ export function Configuration() {
         </span>
 
         {/* Preset shortcut buttons */}
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {PRESETS.filter((p) => p.key !== "custom").map((p) => (
             <button
               key={p.key}
