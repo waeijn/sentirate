@@ -26,15 +26,16 @@ export function TopBar({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 24px",
+        padding: "0 clamp(14px, 2vw, 24px)",
         flexShrink: 0,
         backdropFilter: "var(--glass-blur)",
         WebkitBackdropFilter: "var(--glass-blur)",
         zIndex: 5,
+        gap: 12,
       }}
     >
       {/* Breadcrumbs Navigation */}
-      <nav aria-label="Breadcrumb" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <nav aria-label="Breadcrumb" style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", minWidth: 0 }}>
         {crumbs.map((crumb, idx) => {
           const isLast = idx === crumbs.length - 1;
           return (
