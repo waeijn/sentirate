@@ -47,7 +47,7 @@ export function ExportReportDropdown({ entries, stats, analytics }: { entries: L
       "Timestamp",
       "Source IP Address",
       "Request Rate (req/s)",
-      "Interval (s)",
+      "Interval Regularity (s)",
       "Burst Frequency (per min)",
       "Burst Persistence (s)",
       "Assigned Traffic Profile",
@@ -172,10 +172,10 @@ export function ExportReportDropdown({ entries, stats, analytics }: { entries: L
     const headers = [
       "Timestamp",
       "IP Address",
-      "Rate",
-      "Interval",
-      "Burst Freq",
-      "Persist",
+      "Request Rate (req/s)",
+      "Interval Regularity (s)",
+      "Burst Frequency (per min)",
+      "Burst Persistence (s)",
       "Class",
       "Tokens",
       "Action"
