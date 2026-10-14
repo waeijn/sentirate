@@ -271,7 +271,7 @@ function Slider({
             height: 4,
             width: `${pct}%`,
             borderRadius: 2,
-            background: "var(--accent)", // Brand accent color
+            background: color, // Track color
             transition: "width 0.05s",
           }}
         />
