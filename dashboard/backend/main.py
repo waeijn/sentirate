@@ -79,6 +79,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up — connecting to Redis at %s", REDIS_URL)
     await rc.initialise(REDIS_URL)  
     logger.info("Redis ready.")
+    await shared_limiter.init_runtime_config()
     shared_limiter.start_background()
     yield
     shared_limiter.stop_background()

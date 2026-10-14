@@ -47,10 +47,17 @@ interface CustomProfiles {
   suspicious: ProfileValues;
 }
 
+interface HeuristicThresholds {
+  normalRateMax: number;
+  burstyRateMax: number;
+  suspiciousSigma: number;
+}
+
 interface SavedProfile {
   id: string;
   name: string;
   profiles: CustomProfiles;
+  heuristics?: HeuristicThresholds;
   savedAt: string;
 }
 
@@ -730,6 +737,12 @@ export function Configuration() {
     suspicious: { refill: 2, cap: 5 },
   });
 
+  const [customHeuristics, setCustomHeuristics] = useState<HeuristicThresholds>({
+    normalRateMax: 10,
+    burstyRateMax: 30,
+    suspiciousSigma: 0.1,
+  });
+
   // ── Saved profiles (persisted in localStorage) ────────────────────────────
   const [savedProfiles, setSavedProfiles] = useState<SavedProfile[]>(() => {
     try {
@@ -752,6 +765,7 @@ export function Configuration() {
       id: Date.now().toString(),
       name: saveName.trim(),
       profiles: customProfiles,
+      heuristics: customHeuristics,
       savedAt: nowString(),
     };
     persistSaved([entry, ...savedProfiles]);
@@ -761,6 +775,9 @@ export function Configuration() {
 
   const handleLoadProfile = (p: SavedProfile) => {
     setCustomProfiles(p.profiles);
+    if (p.heuristics) {
+      setCustomHeuristics(p.heuristics);
+    }
     setPreset(PRESETS[3]);
   };
 
@@ -790,24 +807,47 @@ export function Configuration() {
       .then((r) => r.json())
       .then((data) => {
         const p = data.profiles;
-        const nr = p?.normal?.refill_rate ?? 10;
-        const nc = p?.normal?.capacity ?? 20;
+        const b = p?.bursty ?? p?.bursty_legitimate;
+        const s = p?.suspicious ?? p?.suspicious_abusive;
+        const n = p?.normal;
+
+        const nr = n?.refill_rate ?? 10;
+        const nc = n?.capacity ?? 20;
+        const br = b?.refill_rate ?? 20;
+        const bc = b?.capacity ?? 40;
+        const sr = s?.refill_rate ?? 2;
+        const sc = s?.capacity ?? 5;
+
         setBaseRefill(nr);
         setBaseCap(nc);
         setCustomProfiles({
-          normal: {
-            refill: p?.normal?.refill_rate ?? 10,
-            cap: p?.normal?.capacity ?? 20,
-          },
-          bursty: {
-            refill: p?.bursty?.refill_rate ?? 20,
-            cap: p?.bursty?.capacity ?? 40,
-          },
-          suspicious: {
-            refill: p?.suspicious?.refill_rate ?? 2,
-            cap: p?.suspicious?.capacity ?? 5,
-          },
+          normal: { refill: nr, cap: nc },
+          bursty: { refill: br, cap: bc },
+          suspicious: { refill: sr, cap: sc },
         });
+
+        const t = data.thresholds;
+        if (t) {
+          const loadedH: HeuristicThresholds = {
+            normalRateMax: t.normal_rate_max ?? 10,
+            burstyRateMax: t.bursty_rate_max ?? 30,
+            suspiciousSigma: t.suspicious_sigma ?? 0.1,
+          };
+          setCustomHeuristics(loadedH);
+
+          const matched = PRESETS.find(
+            (pr) =>
+              pr.key !== "custom" &&
+              pr.normalRateMax === loadedH.normalRateMax &&
+              pr.burstyRateMax === loadedH.burstyRateMax &&
+              Math.abs(pr.suspiciousSigma - loadedH.suspiciousSigma) < 0.01 &&
+              Math.abs(r1(nr * pr.normalMult.refill) - nr) < 0.1 &&
+              Math.abs(r0(nc * pr.normalMult.capacity) - nc) < 0.1
+          );
+          if (matched) {
+            setPreset(matched);
+          }
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -816,6 +856,17 @@ export function Configuration() {
   const handlePresetSelect = (p: Preset) => {
     if (p.key === "custom" && preset.key !== "custom") {
       setCustomProfiles(deriveProfiles(baseRefill, baseCap, preset));
+      setCustomHeuristics({
+        normalRateMax: preset.normalRateMax,
+        burstyRateMax: preset.burstyRateMax,
+        suspiciousSigma: preset.suspiciousSigma,
+      });
+    } else if (p.key !== "custom") {
+      setCustomHeuristics({
+        normalRateMax: p.normalRateMax,
+        burstyRateMax: p.burstyRateMax,
+        suspiciousSigma: p.suspiciousSigma,
+      });
     }
     setPreset(p);
     setSaveStatus("idle");
@@ -825,10 +876,39 @@ export function Configuration() {
   const handleSave = useCallback(async () => {
     setSaveStatus("saving");
     const ap = activeProfiles;
+    const h =
+      preset.key === "custom"
+        ? customHeuristics
+        : {
+            normalRateMax: preset.normalRateMax,
+            burstyRateMax: preset.burstyRateMax,
+            suspiciousSigma: preset.suspiciousSigma,
+          };
+
+    // Pre-flight validation
+    if (h.normalRateMax >= h.burstyRateMax) {
+      setSaveStatus("error");
+      setSaveMsg("Validation error: Normal Max Rate must be less than Bursty Max Rate.");
+      setTimeout(() => setSaveStatus("idle"), 4000);
+      return;
+    }
+    if (!(ap.suspicious.refill < ap.normal.refill && ap.normal.refill < ap.bursty.refill)) {
+      setSaveStatus("error");
+      setSaveMsg("Validation error: Refill rates must satisfy Suspicious < Normal < Bursty.");
+      setTimeout(() => setSaveStatus("idle"), 4000);
+      return;
+    }
+    if (!(ap.suspicious.cap < ap.normal.cap && ap.normal.cap < ap.bursty.cap)) {
+      setSaveStatus("error");
+      setSaveMsg("Validation error: Capacities must satisfy Suspicious < Normal < Bursty.");
+      setTimeout(() => setSaveStatus("idle"), 4000);
+      return;
+    }
+
     const payload = {
-      normal_rate_max: preset.normalRateMax,
-      bursty_rate_max: preset.burstyRateMax,
-      suspicious_sigma: preset.suspiciousSigma,
+      normal_rate_max: h.normalRateMax,
+      bursty_rate_max: h.burstyRateMax,
+      suspicious_sigma: h.suspiciousSigma,
       normal_refill: ap.normal.refill,
       normal_capacity: ap.normal.cap,
       bursty_refill: ap.bursty.refill,
@@ -857,7 +937,7 @@ export function Configuration() {
       setSaveMsg("Cannot reach middleware — is the server running?");
       setTimeout(() => setSaveStatus("idle"), 4000);
     }
-  }, [baseRefill, baseCap, preset, activeProfiles]);
+  }, [baseRefill, baseCap, preset, activeProfiles, customHeuristics]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -1099,6 +1179,66 @@ export function Configuration() {
               }}
             >
               {preset.description}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                marginTop: 8,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                }}
+              >
+                λ normal:{" "}
+                <strong style={{ color: "var(--normal)" }}>
+                  ≤{" "}
+                  {preset.key === "custom"
+                    ? customHeuristics.normalRateMax
+                    : preset.normalRateMax}{" "}
+                  req/s
+                </strong>
+              </span>
+              <span style={{ color: "var(--border)" }}>·</span>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                }}
+              >
+                λ bursty:{" "}
+                <strong style={{ color: "var(--bursty)" }}>
+                  ≤{" "}
+                  {preset.key === "custom"
+                    ? customHeuristics.burstyRateMax
+                    : preset.burstyRateMax}{" "}
+                  req/s
+                </strong>
+              </span>
+              <span style={{ color: "var(--border)" }}>·</span>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                }}
+              >
+                σ suspicious:{" "}
+                <strong style={{ color: "var(--suspicious)" }}>
+                  &lt;{" "}
+                  {preset.key === "custom"
+                    ? customHeuristics.suspiciousSigma
+                    : preset.suspiciousSigma}
+                  s
+                </strong>
+              </span>
             </div>
           </div>
         </div>
@@ -1343,6 +1483,101 @@ export function Configuration() {
           </div>
         )}
       </Panel>
+
+      {/* Heuristic Classification Thresholds panel — custom mode */}
+      {preset.key === "custom" && (
+        <Panel
+          title="Heuristic Classification Thresholds"
+          subtitle="Customize traffic arrival rate (λ) and inter-arrival interval regularity (σ) boundaries"
+          iconBg="var(--accent-dim)"
+          iconColor="var(--accent)"
+          iconChar="⚙"
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 20,
+            }}
+          >
+            <div>
+              <Slider
+                label="Normal Max Rate (λ normal)"
+                value={customHeuristics.normalRateMax}
+                min={1}
+                max={50}
+                step={1}
+                unit="req/s"
+                color="var(--normal)"
+                onChange={(v) =>
+                  setCustomHeuristics((h) => ({ ...h, normalRateMax: v }))
+                }
+              />
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  lineHeight: 1.4,
+                }}
+              >
+                Baseline human traffic rate ceiling. Requests below this rate are admitted under the Normal profile.
+              </div>
+            </div>
+            <div>
+              <Slider
+                label="Bursty Max Rate (λ bursty)"
+                value={customHeuristics.burstyRateMax}
+                min={10}
+                max={100}
+                step={1}
+                unit="req/s"
+                color="var(--bursty)"
+                onChange={(v) =>
+                  setCustomHeuristics((h) => ({ ...h, burstyRateMax: v }))
+                }
+              />
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  lineHeight: 1.4,
+                }}
+              >
+                Upper ceiling for legitimate traffic bursts. Rates exceeding this threshold trigger Suspicious classification checks.
+              </div>
+            </div>
+            <div>
+              <Slider
+                label="Suspicious Regularity (σ)"
+                value={customHeuristics.suspiciousSigma}
+                min={0.01}
+                max={0.5}
+                step={0.01}
+                unit="s"
+                color="var(--suspicious)"
+                onChange={(v) =>
+                  setCustomHeuristics((h) => ({
+                    ...h,
+                    suspiciousSigma: Math.round(v * 100) / 100,
+                  }))
+                }
+              />
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  lineHeight: 1.4,
+                }}
+              >
+                Machine regularity tripwire. Standard deviation below this value denotes automated scripting or robotic pacing.
+              </div>
+            </div>
+          </div>
+        </Panel>
+      )}
 
       {/* Recently Saved profiles */}
       {preset.key === "custom" && savedProfiles.length > 0 && (

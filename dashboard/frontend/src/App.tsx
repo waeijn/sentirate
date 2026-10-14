@@ -7,6 +7,7 @@ import { TopBar } from "./components/layout/TopBar";
 import { Monitoring } from "./pages/Monitoring";
 import { TrafficLogs } from "./pages/TrafficLogs";
 import { Configuration } from "./pages/Configuration";
+import { ConfigWarningModal } from "./components/configuration/ConfigWarningModal";
 
 import type {
   StatCardData,
@@ -111,6 +112,16 @@ export default function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   // Navigation handler
+  const [showConfigWarning, setShowConfigWarning] = useState(false);
+
+  const handleNavigate = (targetPage: Page) => {
+    if (targetPage === "configuration" && page !== "configuration") {
+      setShowConfigWarning(true);
+    } else {
+      setPage(targetPage);
+    }
+  };
+
   const handleNavigateToLogs = (ipFilter?: string, ipHighlight?: string) => {
     setLogsSearch(ipFilter || "");
     setLogsHighlight(ipHighlight || "");
@@ -385,7 +396,7 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-      <Sidebar activePage={page} onNavigate={setPage} isDark={isDark} setIsDark={setIsDark} />
+      <Sidebar activePage={page} onNavigate={handleNavigate} isDark={isDark} setIsDark={setIsDark} />
 
       <div
         style={{
@@ -416,6 +427,16 @@ export default function App() {
           {page === "configuration" && <Configuration />}
         </main>
       </div>
+
+      {/* Warning popup when navigating to Configuration view */}
+      <ConfigWarningModal
+        isOpen={showConfigWarning}
+        onConfirm={() => {
+          setShowConfigWarning(false);
+          setPage("configuration");
+        }}
+        onCancel={() => setShowConfigWarning(false)}
+      />
     </div>
   );
 }
