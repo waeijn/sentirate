@@ -25,17 +25,22 @@ export function TrafficLogs({ entries, stats, analytics, initialSearch, highligh
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
       {/* ── Left: scrollable padded content ── */}
       <div
+        className="page-container"
         style={{
           flex: 1,
           minWidth: 0,
           overflowY: "auto",
-          padding: "40px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 32,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+            gap: 16,
+          }}
+        >
           <div>
             <h1
               style={{
@@ -66,6 +71,12 @@ export function TrafficLogs({ entries, stats, analytics, initialSearch, highligh
       </div>
 
       {/* ── Right: full-height drawer, flush to edge ── */}
+      {selected && (
+        <div
+          className="explanation-backdrop-responsive"
+          onClick={() => setSelected(null)}
+        />
+      )}
       <RequestExplanationPanel
         entry={selected}
         onClose={() => setSelected(null)}

@@ -212,7 +212,7 @@ export function LogsTable({ entries, selected, onSelect, initialSearch, highligh
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* ── Summary Metrics ── */}
-      <div style={{ display: "flex", gap: 16 }}>
+      <div className="logs-metrics-grid">
         {metricBlock("FILTERED RECORDS", filtered.length, "events", "var(--text-muted)", true)}
         {metricBlock("ALLOWED", allowed, "passed", "var(--normal)", allowed === 0)}
         {metricBlock("THROTTLED", throttled, "queued", "var(--bursty)", throttled === 0)}
@@ -220,7 +220,7 @@ export function LogsTable({ entries, selected, onSelect, initialSearch, highligh
       </div>
 
       {/* ── Toolbar ── */}
-      <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
         {/* Search */}
         <div
           style={{

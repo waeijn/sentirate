@@ -203,6 +203,7 @@ export function RequestExplanationPanel({
 }: RequestExplanationPanelProps) {
   return (
     <div
+      className={entry ? "explanation-panel-responsive" : ""}
       style={{
         width: entry ? 340 : 0,
         minWidth: entry ? 340 : 0,
