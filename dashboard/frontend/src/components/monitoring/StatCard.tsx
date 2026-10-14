@@ -405,6 +405,12 @@ export function StatCard({
 }) {
   const [showModal, setShowModal] = useState(false);
   const iconColor = ICON_COLORS[data.icon];
+  const isThreatDetection = data.icon === "threats";
+
+  const fpr = analytics?.fpr;
+  const fnr = analytics?.fnr;
+  const fprValue = fpr != null ? fpr.toFixed(1) : "0.0";
+  const fnrValue = fnr != null ? fnr.toFixed(1) : "0.0";
 
   return (
     <>
@@ -428,10 +434,12 @@ export function StatCard({
             padding: 24,
             display: "flex",
             flexDirection: "column",
+            justifyContent: "space-between",
             gap: 12,
             position: "relative",
             overflow: "hidden",
             transition: "border-color 0.2s",
+            height: "100%",
           } as React.CSSProperties
         }
         onMouseEnter={(e) => {
@@ -442,7 +450,7 @@ export function StatCard({
           (e.currentTarget as HTMLElement).style.borderColor = "var(--glass-border)";
         }}
       >
-
+        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -459,7 +467,7 @@ export function StatCard({
               letterSpacing: "0.05em",
             }}
           >
-            {data.label}
+            {isThreatDetection ? "THREAT DETECTION" : data.label}
           </span>
           <div
             style={{
@@ -477,69 +485,180 @@ export function StatCard({
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <span
+        {/* Primary Metrics */}
+        {isThreatDetection ? (
+          <div
             style={{
-              fontSize: 32,
-              fontWeight: 700,
-              fontFamily: "var(--font-mono)",
-              color: "var(--text)",
-              letterSpacing: -1,
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 20,
+              width: "100%",
             }}
           >
-            {data.value}
-          </span>
-          <span
-            style={{
-              fontSize: 13,
-              color: "var(--text-muted)",
-              fontWeight: 400,
-            }}
-          >
-            {data.unit}
-          </span>
-        </div>
+            {/* Left Column: FPR */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "var(--bursty)",
+                    display: "inline-block",
+                    flexShrink: 0,
+                    boxShadow: "0 0 6px var(--bursty-glow)",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "var(--text-muted)",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  FPR
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span
+                  style={{
+                    fontSize: 32,
+                    fontWeight: 700,
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--text)",
+                    letterSpacing: -1,
+                  }}
+                >
+                  {fprValue}
+                </span>
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                    fontWeight: 400,
+                  }}
+                >
+                  %
+                </span>
+              </div>
+            </div>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <span
+            {/* Right Column: FNR */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "var(--suspicious)",
+                    display: "inline-block",
+                    flexShrink: 0,
+                    boxShadow: "0 0 6px var(--suspicious-glow)",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "var(--text-muted)",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  FNR
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span
+                  style={{
+                    fontSize: 32,
+                    fontWeight: 700,
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--text)",
+                    letterSpacing: -1,
+                  }}
+                >
+                  {fnrValue}
+                </span>
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                    fontWeight: 400,
+                  }}
+                >
+                  %
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6, minHeight: 38 }}>
+            <span
+              style={{
+                fontSize: 32,
+                fontWeight: 700,
+                fontFamily: "var(--font-mono)",
+                color: "var(--text)",
+                letterSpacing: -1,
+              }}
+            >
+              {data.value}
+            </span>
+            <span
+              style={{
+                fontSize: 13,
+                color: "var(--text-muted)",
+                fontWeight: 400,
+              }}
+            >
+              {data.unit}
+            </span>
+          </div>
+        )}
+
+        {/* Sub-metric & Action Footer */}
+        {isThreatDetection ? (
+          <div
+            className="flex items-center justify-between w-full"
             style={{
-              fontSize: 11,
-              color: data.deltaPositive ? "var(--normal)" : "var(--suspicious)",
               display: "flex",
+              justifyContent: "space-between",
               alignItems: "center",
-              gap: 4,
             }}
           >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-            >
-              {data.deltaPositive ? (
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-              ) : (
-                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
-              )}
-            </svg>
-            {data.delta}
-          </span>
-          {data.link && (
             <span
+              style={{
+                fontSize: 11,
+                color:
+                  (Number(String(data.value).replace(/,/g, "")) || 0) > 0
+                    ? "var(--suspicious)"
+                    : "var(--normal)",
+                fontWeight: 500,
+              }}
+            >
+              {data.delta ||
+                `${(
+                  Number(String(data.value).replace(/,/g, "")) || 0
+                ).toLocaleString()} blocked`}
+            </span>
+            <button
+              type="button"
               onClick={() => setShowModal(true)}
               style={{
+                background: "transparent",
+                border: "none",
+                padding: 0,
                 fontSize: 11,
                 color: "var(--accent)",
                 cursor: "pointer",
+                fontWeight: 500,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 2,
                 transition: "opacity 0.15s",
               }}
               onMouseEnter={(e) => {
@@ -549,10 +668,66 @@ export function StatCard({
                 (e.currentTarget as HTMLElement).style.opacity = "1";
               }}
             >
-              {data.link} →
+              View Details →
+            </button>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                color:
+                  data.deltaColor ||
+                  (data.deltaPositive ? "var(--normal)" : "var(--suspicious)"),
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              >
+                {data.deltaPositive ? (
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                ) : (
+                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+                )}
+              </svg>
+              {data.delta}
             </span>
-          )}
-        </div>
+            {data.link && (
+              <span
+                onClick={() => setShowModal(true)}
+                style={{
+                  fontSize: 11,
+                  color: "var(--accent)",
+                  cursor: "pointer",
+                  transition: "opacity 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.opacity = "0.7";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.opacity = "1";
+                }}
+              >
+                {data.link} →
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
