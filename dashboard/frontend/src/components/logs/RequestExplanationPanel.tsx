@@ -13,12 +13,12 @@ function markerLabel(
   value: number,
   sigma?: number | null,
 ): string {
-  if (marker === "Rate" || marker.startsWith("Rate")) {
+  if (marker === "Request Rate" || marker === "Rate" || marker.startsWith("Rate")) {
     if (value > 30) return `Above suspicious threshold (> 30 req/s)`;
     if (value > 10) return `In bursty range (11–30 req/s)`;
     return `Within normal range (≤ 10 req/s)`;
   }
-  if (marker === "Interval" || marker.startsWith("Sigma")) {
+  if (marker === "Interval Regularity" || marker === "Interval" || marker.startsWith("Sigma")) {
     if (sigma === null || sigma === undefined) return "Insufficient history";
     if (sigma < 0.1) return "Very low — machine-like timing precision";
     if (sigma < 0.5) return "Low — semi-regular timing";
@@ -29,7 +29,7 @@ function markerLabel(
     if (value >= 3) return `In bursty range (3–5/min)`;
     return `Within normal range (0–2/min)`;
   }
-  if (marker === "Persistence") {
+  if (marker === "Burst Persistence" || marker === "Persistence") {
     if (value > 60) return `Above suspicious threshold (> 60s)`;
     if (value >= 5) return `In bursty range (5–60s)`;
     return `Low — brief activity (< 5s)`;
@@ -42,14 +42,14 @@ function markerColor(
   value: number,
   sigma?: number | null,
 ): string {
-  if (marker === "Rate" || marker.startsWith("Rate")) {
+  if (marker === "Request Rate" || marker === "Rate" || marker.startsWith("Rate")) {
     return value > 30
       ? "var(--suspicious)"
       : value > 10
         ? "var(--bursty)"
         : "var(--normal)";
   }
-  if (marker === "Interval" || marker.startsWith("Sigma")) {
+  if (marker === "Interval Regularity" || marker === "Interval" || marker.startsWith("Sigma")) {
     if (sigma === null || sigma === undefined) return "var(--text-muted)";
     return sigma < 0.1
       ? "var(--suspicious)"
@@ -64,7 +64,7 @@ function markerColor(
         ? "var(--bursty)"
         : "var(--normal)";
   }
-  if (marker === "Persistence") {
+  if (marker === "Burst Persistence" || marker === "Persistence") {
     return value > 60
       ? "var(--suspicious)"
       : value >= 5
@@ -368,10 +368,10 @@ export function RequestExplanationPanel({
             >
               {entry.justification ||
                 (entry.classification === "suspicious"
-                  ? `Classified as Suspicious. One or more behavioral markers exceeded thresholds: rate=${entry.requestRate.toFixed(1)} req/s, interval=${entry.sigma?.toFixed(3) ?? "N/A"}s, burst freq=${entry.burstFreq}/min, persistence=${entry.persistence.toFixed(1)}s. Token bucket restricted to r=${entry.refillRate} tok/s, b=${entry.bucketCapacity} tokens.`
+                  ? `Classified as Suspicious. One or more behavioral markers exceeded thresholds: request rate=${entry.requestRate.toFixed(1)} req/s, interval regularity=${entry.sigma?.toFixed(3) ?? "N/A"}s, burst frequency=${entry.burstFreq}/min, burst persistence=${entry.persistence.toFixed(1)}s. Token bucket restricted to r=${entry.refillRate} tok/s, b=${entry.bucketCapacity} tokens.`
                   : entry.classification === "bursty"
-                    ? `Classified as Bursty Legitimate. Rate=${entry.requestRate.toFixed(1)} req/s is in the elevated range (11–30 req/s). Pattern is consistent with batch operations or app sync. Token bucket expanded to r=${entry.refillRate} tok/s, b=${entry.bucketCapacity} tokens.`
-                    : `Classified as Normal. Rate=${entry.requestRate.toFixed(1)} req/s is within the normal range (≤ 10 req/s). Default token bucket applied: r=${entry.refillRate} tok/s, b=${entry.bucketCapacity} tokens.`)}
+                    ? `Classified as Bursty Legitimate. Request rate=${entry.requestRate.toFixed(1)} req/s is in the elevated range (11–30 req/s). Pattern is consistent with batch operations or app sync. Token bucket expanded to r=${entry.refillRate} tok/s, b=${entry.bucketCapacity} tokens.`
+                    : `Classified as Normal. Request rate=${entry.requestRate.toFixed(1)} req/s is within the normal range (≤ 10 req/s). Default token bucket applied: r=${entry.refillRate} tok/s, b=${entry.bucketCapacity} tokens.`)}
             </p>
 
             {/* Matched rules */}
@@ -398,14 +398,14 @@ export function RequestExplanationPanel({
               Behavioral Markers
             </h4>
             <MarkerRow
-              label="Rate"
+              label="Request Rate"
               value={entry.requestRate}
               max={100}
               unit="req/s"
               decimals={1}
             />
             <MarkerRow
-              label="Interval"
+              label="Interval Regularity"
               value={entry.sigma ?? 0}
               max={2.0}
               unit="s"
@@ -420,7 +420,7 @@ export function RequestExplanationPanel({
               decimals={0}
             />
             <MarkerRow
-              label="Persistence"
+              label="Burst Persistence"
               value={entry.persistence}
               max={60}
               unit="s"
