@@ -62,10 +62,10 @@ export function Monitoring({
         }}
       >
         {stats.map((s, i) => (
-          <div key={i} style={{ animationDelay: `${i * 60}ms` }}>
+          <div key={i} style={{ animationDelay: `${i * 60}ms`, height: "100%" }}>
             <StatCard
               data={s}
-              analytics={s.icon === "acceptance" ? analytics : undefined}
+              analytics={analytics}
             />
           </div>
         ))}
