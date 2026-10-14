@@ -211,8 +211,29 @@ select {
   background-image: none;
 }
 
-/* Smooth sliding for chart X-axis labels */
-.recharts-cartesian-axis-tick {
-  transition: transform 2s linear;
+/* ── Flexbox Utility Classes ────────────────────────────────────────────── */
+.flex {
+  display: flex;
+}
+.flex-col {
+  flex-direction: column;
+}
+.items-center {
+  align-items: center;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.w-full {
+  width: 100%;
+}
+.gap-2 {
+  gap: 8px;
+}
+.gap-3 {
+  gap: 12px;
+}
+.gap-4 {
+  gap: 16px;
 }
 
