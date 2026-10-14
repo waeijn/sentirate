@@ -132,7 +132,7 @@ const COL_HEADERS = [
   { label: "Client IP", centered: false },
   { label: "Rate", centered: false },
   { label: "Interval", centered: false },
-  { label: "Burst Freq", centered: false },
+  { label: "Frequency", centered: false },
   { label: "Persistence", centered: false },
   { label: "Classification", centered: false },
   { label: "Action", centered: false },
