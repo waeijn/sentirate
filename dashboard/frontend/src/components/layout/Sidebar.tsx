@@ -95,15 +95,18 @@ export function Sidebar({ activePage, onNavigate, isDark, setIsDark }: SidebarPr
         zIndex: 10,
       }}
     >
-      {/* Logo */}
+      {/* Logo & Brand Header */}
       <div
         style={{
-          padding: collapsed ? "20px 0" : "20px 16px",
+          height: 60,
+          boxSizing: "border-box",
+          padding: collapsed ? "0" : "0 16px",
           borderBottom: "1px solid var(--border)",
           display: "flex",
           alignItems: "center",
           gap: 10,
           justifyContent: collapsed ? "center" : "flex-start",
+          flexShrink: 0,
         }}
       >
         <div
@@ -119,27 +122,35 @@ export function Sidebar({ activePage, onNavigate, isDark, setIsDark }: SidebarPr
           <img src="/logo.png" alt="SentiRate Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
         {!collapsed && (
-          <div>
-            <div
+          <div style={{ display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+            <span
               style={{
-                fontSize: 13,
-                fontWeight: 700,
+                fontSize: 16,
+                fontWeight: 800,
                 color: "var(--text)",
-                letterSpacing: 0.3,
+                letterSpacing: "-0.02em",
+                fontFamily: "var(--font-display)",
+                lineHeight: 1.2,
               }}
             >
-              Dashboard
-            </div>
-            <div
+              SentiRate
+            </span>
+            <span
               style={{
                 fontSize: 10,
+                fontWeight: 500,
                 color: "var(--text-muted)",
-                letterSpacing: 0.5,
-                textTransform: "uppercase",
+                letterSpacing: "0.01em",
+                fontFamily: "var(--font-display)",
+                lineHeight: 1.2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
+              title="Adaptive API Rate Limiting"
             >
-              Overview
-            </div>
+              Adaptive API Rate Limiting
+            </span>
           </div>
         )}
       </div>
