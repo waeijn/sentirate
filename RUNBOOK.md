@@ -13,11 +13,17 @@ The easiest way to operate the system is via the included PowerShell automation 
 1. Open PowerShell in the project root directory.
 2. Run the start script:
 
+   **Standard HTTP Mode (Default):**
    ```powershell
    .\start_all.ps1
    ```
 
-   _This will automatically launch the Redis Docker container, the FastAPI backend (Port 8050), and the React frontend (Port 5173)._
+   **Secure HTTPS / SSL Mode:**
+   ```powershell
+   .\start_all.ps1 -Https
+   ```
+
+   _This will automatically launch the Redis Docker container, the FastAPI backend (Port 8050), the mock upstream server (Port 8000), and the React frontend (Port 5173). In HTTPS mode, it automatically detects or generates local SSL certificates (`certs/cert.pem`, `certs/key.pem`) and upgrades WebSocket connections to `wss://`._
 
 ### Stopping the System
 

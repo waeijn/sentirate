@@ -7,6 +7,7 @@ import { TopBar } from "./components/layout/TopBar";
 import { Monitoring } from "./pages/Monitoring";
 import { TrafficLogs } from "./pages/TrafficLogs";
 import { Configuration } from "./pages/Configuration";
+import { ConfigWarningModal } from "./components/configuration/ConfigWarningModal";
 
 import type {
   StatCardData,
@@ -18,7 +19,7 @@ import type {
   AlertSeverity,
 } from "./types";
 
-const BACKEND = import.meta.env.VITE_API_URL || "http://localhost:8050";
+const BACKEND = import.meta.env.VITE_API_URL || "";
 
 type Page = "monitoring" | "logs" | "configuration";
 
@@ -41,84 +42,39 @@ function makeAlert(
   };
 }
 
-const SEED_ALERTS: Alert[] = [
-  makeAlert(
-    "warning",
-    "Refill rate reduced for IP 192.168.1.47 due to high interval regularity (0.94)",
-    "14:32:08",
-    "192.168.1.47",
-    "Bursty"
-  ),
-  makeAlert(
-    "success",
-    "Bucket capacity increased for subnet 10.0.3.x — burst pattern classified as legitimate",
-    "14:31:55",
-    "10.0.3.x",
-    "Normal"
-  ),
-  makeAlert(
-    "error",
-    "IP 203.0.113.15 blocked — persistence score exceeded threshold (0.98)",
-    "14:31:22",
-    "203.0.113.15",
-    "Suspicious"
-  ),
-  makeAlert(
-    "warning",
-    "Throttle applied to IP 198.51.100.22 — request rate spike detected (340 req/s)",
-    "14:30:47",
-    "198.51.100.22",
-    "Bursty"
-  ),
-  makeAlert(
-    "info",
-    "Dynamic optimization adjusted baseline parameters: r=150, b=320",
-    "14:29:18",
-    "System",
-    "Info"
-  ),
-  makeAlert(
-    "success",
-    "IP 172.16.0.88 unblocked — behavioral markers returned to normal range",
-    "14:28:03",
-    "172.16.0.88",
-    "Normal"
-  ),
-];
-
-const SEED_STATS: StatCardData[] = [
+const INITIAL_STATS: StatCardData[] = [
   {
     label: "System Throughput",
-    value: "1,247",
+    value: "0",
     unit: "req/s",
-    delta: "+8.2% vs last hour",
+    delta: "0 clients",
     deltaPositive: true,
     icon: "throughput",
   },
   {
     label: "Request Latency",
-    value: "23",
+    value: "0",
     unit: "ms",
-    delta: "-3.1ms vs last hour",
+    delta: "Low",
     deltaPositive: true,
+    deltaColor: "var(--normal)",
     icon: "latency",
   },
   {
-    label: "Total Blocked Threats",
-    value: "38",
-    unit: "today",
-    delta: "+12 from yesterday",
-    deltaPositive: false,
-    icon: "threats",
-  },
-  {
     label: "Request Acceptance Rate",
-    value: "96.4",
+    value: "100.0",
     unit: "%",
-    delta: "+0.5% vs last hour",
+    delta: "0 allowed",
     deltaPositive: true,
     icon: "acceptance",
-    link: "View Analytics",
+  },
+  {
+    label: "THREAT DETECTION",
+    value: "0",
+    unit: "rejected",
+    delta: "0 blocked",
+    deltaPositive: false,
+    icon: "threats",
   },
 ];
 
@@ -136,9 +92,9 @@ export default function App() {
   const [uptime, setUptime] = useState(0);
 
   // Monitoring state
-  const [stats, setStats] = useState<StatCardData[]>(SEED_STATS);
+  const [stats, setStats] = useState<StatCardData[]>(INITIAL_STATS);
   const [chartData, setChartData] = useState<TrafficPoint[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>(SEED_ALERTS);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [analytics, setAnalytics] = useState<{
     fpr: number | null;
     fnr: number | null;
@@ -156,6 +112,16 @@ export default function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   // Navigation handler
+  const [showConfigWarning, setShowConfigWarning] = useState(false);
+
+  const handleNavigate = (targetPage: Page) => {
+    if (targetPage === "configuration" && page !== "configuration") {
+      setShowConfigWarning(true);
+    } else {
+      setPage(targetPage);
+    }
+  };
+
   const handleNavigateToLogs = (ipFilter?: string, ipHighlight?: string) => {
     setLogsSearch(ipFilter || "");
     setLogsHighlight(ipHighlight || "");
@@ -178,11 +144,8 @@ export default function App() {
       await fetch(BACKEND + "/api/clients", { method: "DELETE" });
       setChartData([]);
       setLogs([]);
-      setStats((prev) =>
-        prev.map((s) =>
-          s.label === "Request Acceptance Rate" ? { ...s, value: "100.0" } : { ...s, value: "0" }
-        )
-      );
+      setAlerts([]);
+      setStats(INITIAL_STATS);
       setAnalytics({ fpr: 0, fnr: 0, tpr: 100, tnr: 100, accuracy: 100 });
       prevTotalRef.current = 0;
     } catch (err) {
@@ -242,12 +205,35 @@ export default function App() {
           acceptRate = s.rar_percent.toFixed(1);
         }
 
+        // Latency rating according to SLA benchmarks:
+        // < 10ms: Low (Excellent), 10-25ms: Medium (Good/Fair), > 25ms: High (Poor)
+        const latencyMs =
+          s.avg_latency_ms != null && s.avg_latency_ms > 0
+            ? s.avg_latency_ms
+            : s.p95_latency_ms != null && s.p95_latency_ms > 0
+            ? s.p95_latency_ms
+            : 0;
+
+        let latencyTier = "Low";
+        let latencyPositive = true;
+        let latencyColor = "var(--normal)";
+
+        if (latencyMs > 25) {
+          latencyTier = "High";
+          latencyPositive = false;
+          latencyColor = "var(--suspicious)";
+        } else if (latencyMs >= 10) {
+          latencyTier = "Medium";
+          latencyPositive = true;
+          latencyColor = "var(--bursty)";
+        }
+
         setStats([
           {
             label: "System Throughput",
             value: rps.toLocaleString(),
             unit: "req/s",
-            delta: `${s.active_clients} clients`,
+            delta: `${s.active_clients.toLocaleString()} clients`,
             deltaPositive: true,
             icon: "throughput",
           },
@@ -258,29 +244,26 @@ export default function App() {
                 ? s.avg_latency_ms.toFixed(2)
                 : "< 1",
             unit: "ms",
-            delta:
-              s.p95_latency_ms != null && s.p95_latency_ms > 0
-                ? `p95: ${s.p95_latency_ms.toFixed(2)}ms`
-                : "Within latency target",
-            deltaPositive: true,
+            delta: latencyTier,
+            deltaPositive: latencyPositive,
+            deltaColor: latencyColor,
             icon: "latency",
-          },
-          {
-            label: "Total Blocked Threats",
-            value: s.total_rejected.toString(),
-            unit: "rejected",
-            delta: `${s.classifications.suspicious} suspicious`,
-            deltaPositive: false,
-            icon: "threats",
           },
           {
             label: "Request Acceptance Rate",
             value: acceptRate,
             unit: acceptRate === "N/A" ? "" : "%",
-            delta: `${s.total_accepted} allowed`,
+            delta: `${s.total_accepted.toLocaleString()} allowed`,
             deltaPositive: true,
             icon: "acceptance",
-            link: "View Analytics",
+          },
+          {
+            label: "THREAT DETECTION",
+            value: s.total_rejected.toLocaleString(),
+            unit: "rejected",
+            delta: `${s.total_rejected.toLocaleString()} blocked`,
+            deltaPositive: false,
+            icon: "threats",
           },
         ]);
 
@@ -405,15 +388,15 @@ export default function App() {
     };
   }, []);
 
-  const PAGE_TITLES: Record<Page, string> = {
-    monitoring: "Adaptive API Rate Limiting",
-    logs: "Adaptive API Rate Limiting",
-    configuration: "Adaptive API Rate Limiting",
+  const BREADCRUMBS: Record<Page, string[]> = {
+    monitoring: ["Monitoring", "Live Overview"],
+    logs: ["Traffic Logs", "Telemetry"],
+    configuration: ["Configuration", "Algorithm Parameters"],
   };
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-      <Sidebar activePage={page} onNavigate={setPage} isDark={isDark} setIsDark={setIsDark} />
+      <Sidebar activePage={page} onNavigate={handleNavigate} isDark={isDark} setIsDark={setIsDark} />
 
       <div
         style={{
@@ -424,7 +407,7 @@ export default function App() {
         }}
       >
         <TopBar
-          title={PAGE_TITLES[page]}
+          breadcrumbs={BREADCRUMBS[page]}
           connected={connected}
           onResetState={handleResetMetrics}
         />
@@ -444,6 +427,16 @@ export default function App() {
           {page === "configuration" && <Configuration />}
         </main>
       </div>
+
+      {/* Warning popup when navigating to Configuration view */}
+      <ConfigWarningModal
+        isOpen={showConfigWarning}
+        onConfirm={() => {
+          setShowConfigWarning(false);
+          setPage("configuration");
+        }}
+        onCancel={() => setShowConfigWarning(false)}
+      />
     </div>
   );
 }

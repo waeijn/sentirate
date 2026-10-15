@@ -9,6 +9,7 @@ export interface StatCardData {
   unit: string;
   delta: string;
   deltaPositive: boolean;
+  deltaColor?: string;
   icon: "throughput" | "latency" | "threats" | "acceptance";
   link?: string;
 }

@@ -75,6 +75,7 @@ LATENCY_MAXLEN = 2000
 LUA_CONSUME_BUCKET = """
 local bkey        = KEYS[1]
 local state_key   = KEYS[2]
+local config_key  = KEYS[3]
 local time_arr    = redis.call('TIME')
 local now         = tonumber(time_arr[1]) + tonumber(time_arr[2]) / 1000000.0
 local cost        = tonumber(ARGV[1])
@@ -96,6 +97,21 @@ elseif class_str == "suspicious" then
 elseif class_str == "bursty" then
     capacity = 40
     refill   = 20
+elseif class_str == "blocked" then
+    capacity = 0
+    refill   = 0
+end
+
+if config_key and config_key ~= "" then
+    local cfg = redis.call('HMGET', config_key, class_str .. ':cap', class_str .. ':refill')
+    if cfg[1] then
+        local c = tonumber(cfg[1])
+        if c then capacity = c end
+    end
+    if cfg[2] then
+        local r = tonumber(cfg[2])
+        if r then refill = r end
+    end
 end
 
 local data        = redis.call('HMGET', bkey, 'tokens', 'last_refill')
@@ -201,6 +217,139 @@ class AdaptiveRateLimiter:
             self._lua_sha = await self._redis.script_load(LUA_CONSUME_BUCKET)
             return await self._redis.evalsha(self._lua_sha, *args[1:])
 
+    # ------------------------------------------------------------------
+    # Runtime Configuration (Redis-backed Dynamic Reconfiguration)
+    # ------------------------------------------------------------------
+
+    async def init_runtime_config(self) -> None:
+        """
+        Initialises runtime configuration from Redis if present,
+        or seeds Redis with module defaults.
+        """
+        global NORMAL_RATE_MAX, LAMBDA_NORMAL_MAX, LAMBDA_BURSTY_MAX
+        global SUSPICIOUS_RATE, SUSPICIOUS_SIGMA, SIGMA_BOT_THRESHOLD
+        global BUCKET_PROFILES
+
+        config_key = f"{REDIS_NS}:_config"
+        try:
+            cfg = await self._redis.hgetall(config_key)
+            if cfg:
+                cfg_str = {
+                    (k.decode("utf-8") if isinstance(k, bytes) else k):
+                    (v.decode("utf-8") if isinstance(v, bytes) else v)
+                    for k, v in cfg.items()
+                }
+                if "normal:cap" in cfg_str and "normal:refill" in cfg_str:
+                    BUCKET_PROFILES["normal"] = (float(cfg_str["normal:cap"]), float(cfg_str["normal:refill"]))
+                if "bursty:cap" in cfg_str and "bursty:refill" in cfg_str:
+                    BUCKET_PROFILES["bursty"] = (float(cfg_str["bursty:cap"]), float(cfg_str["bursty:refill"]))
+                if "suspicious:cap" in cfg_str and "suspicious:refill" in cfg_str:
+                    BUCKET_PROFILES["suspicious"] = (float(cfg_str["suspicious:cap"]), float(cfg_str["suspicious:refill"]))
+                if "normal_rate_max" in cfg_str:
+                    NORMAL_RATE_MAX = float(cfg_str["normal_rate_max"])
+                    LAMBDA_NORMAL_MAX = NORMAL_RATE_MAX
+                if "bursty_rate_max" in cfg_str:
+                    LAMBDA_BURSTY_MAX = float(cfg_str["bursty_rate_max"])
+                    SUSPICIOUS_RATE = LAMBDA_BURSTY_MAX
+                if "suspicious_sigma" in cfg_str:
+                    SUSPICIOUS_SIGMA = float(cfg_str["suspicious_sigma"])
+                    SIGMA_BOT_THRESHOLD = SUSPICIOUS_SIGMA
+                logger.info("Runtime configuration successfully loaded from Redis.")
+            else:
+                await self.sync_config_to_redis()
+                logger.info("Seeded default runtime configuration to Redis.")
+        except Exception as e:
+            logger.warning("Could not sync runtime config with Redis: %s", e)
+
+    async def sync_config_to_redis(self) -> None:
+        """Persists current module-level configuration into Redis hash."""
+        config_key = f"{REDIS_NS}:_config"
+        mapping = {
+            "normal:cap": str(float(BUCKET_PROFILES["normal"][0])),
+            "normal:refill": str(float(BUCKET_PROFILES["normal"][1])),
+            "bursty:cap": str(float(BUCKET_PROFILES["bursty"][0])),
+            "bursty:refill": str(float(BUCKET_PROFILES["bursty"][1])),
+            "suspicious:cap": str(float(BUCKET_PROFILES["suspicious"][0])),
+            "suspicious:refill": str(float(BUCKET_PROFILES["suspicious"][1])),
+            "probation:cap": str(float(BUCKET_PROFILES["probation"][0])),
+            "probation:refill": str(float(BUCKET_PROFILES["probation"][1])),
+            "normal_rate_max": str(float(NORMAL_RATE_MAX)),
+            "bursty_rate_max": str(float(LAMBDA_BURSTY_MAX)),
+            "suspicious_sigma": str(float(SUSPICIOUS_SIGMA)),
+        }
+        await self._redis.hset(config_key, mapping=mapping)
+
+    async def update_runtime_config(
+        self,
+        normal_rate_max: float,
+        bursty_rate_max: float,
+        suspicious_sigma: float,
+        normal_capacity: float,
+        normal_refill: float,
+        bursty_capacity: float,
+        bursty_refill: float,
+        suspicious_capacity: float,
+        suspicious_refill: float,
+    ) -> dict:
+        """
+        Dynamically applies updated thresholds and token bucket profiles
+        at runtime without restarting the server.
+        """
+        global NORMAL_RATE_MAX, LAMBDA_NORMAL_MAX, LAMBDA_BURSTY_MAX
+        global SUSPICIOUS_RATE, SUSPICIOUS_SIGMA, SIGMA_BOT_THRESHOLD
+        global BUCKET_PROFILES
+
+        NORMAL_RATE_MAX = float(normal_rate_max)
+        LAMBDA_NORMAL_MAX = float(normal_rate_max)
+        LAMBDA_BURSTY_MAX = float(bursty_rate_max)
+        SUSPICIOUS_RATE = float(bursty_rate_max)
+        SUSPICIOUS_SIGMA = float(suspicious_sigma)
+        SIGMA_BOT_THRESHOLD = float(suspicious_sigma)
+
+        BUCKET_PROFILES["normal"] = (float(normal_capacity), float(normal_refill))
+        BUCKET_PROFILES["bursty"] = (float(bursty_capacity), float(bursty_refill))
+        BUCKET_PROFILES["suspicious"] = (float(suspicious_capacity), float(suspicious_refill))
+
+        await self.sync_config_to_redis()
+
+        logger.info(
+            "Runtime config updated: normal=(%.1f, %.1f), bursty=(%.1f, %.1f), suspicious=(%.1f, %.1f), "
+            "normal_rate_max=%.1f, bursty_rate_max=%.1f, suspicious_sigma=%.2f",
+            normal_capacity, normal_refill, bursty_capacity, bursty_refill,
+            suspicious_capacity, suspicious_refill,
+            normal_rate_max, bursty_rate_max, suspicious_sigma,
+        )
+
+        if self._sio:
+            try:
+                await self._sio.emit("config_updated", {
+                    "thresholds": {
+                        "normal_rate_max": NORMAL_RATE_MAX,
+                        "bursty_rate_max": LAMBDA_BURSTY_MAX,
+                        "suspicious_sigma": SUSPICIOUS_SIGMA,
+                    },
+                    "profiles": {
+                        "normal": {"capacity": BUCKET_PROFILES["normal"][0], "refill_rate": BUCKET_PROFILES["normal"][1]},
+                        "bursty": {"capacity": BUCKET_PROFILES["bursty"][0], "refill_rate": BUCKET_PROFILES["bursty"][1]},
+                        "suspicious": {"capacity": BUCKET_PROFILES["suspicious"][0], "refill_rate": BUCKET_PROFILES["suspicious"][1]},
+                    },
+                })
+            except Exception as e:
+                logger.debug("Failed to emit config_updated: %s", e)
+
+        return {
+            "thresholds": {
+                "normal_rate_max": NORMAL_RATE_MAX,
+                "bursty_rate_max": LAMBDA_BURSTY_MAX,
+                "suspicious_sigma": SUSPICIOUS_SIGMA,
+            },
+            "profiles": {
+                "normal": {"capacity": BUCKET_PROFILES["normal"][0], "refill_rate": BUCKET_PROFILES["normal"][1]},
+                "bursty": {"capacity": BUCKET_PROFILES["bursty"][0], "refill_rate": BUCKET_PROFILES["bursty"][1]},
+                "suspicious": {"capacity": BUCKET_PROFILES["suspicious"][0], "refill_rate": BUCKET_PROFILES["suspicious"][1]},
+            },
+        }
+
     # =========================================================================
     # HOT PATH
     # =========================================================================
@@ -217,8 +366,8 @@ class AdaptiveRateLimiter:
 
         # 1. Token bucket + classification: single Redis RTT
         result = await self._evalsha(
-            self._lua_sha, 2,
-            self._k(ip, "bucket"), self._k(ip, "state"),
+            self._lua_sha, 3,
+            self._k(ip, "bucket"), self._k(ip, "state"), f"{REDIS_NS}:_config",
             "1", str(BUCKET_TTL),
         )
         allowed     = bool(int(result[0]))

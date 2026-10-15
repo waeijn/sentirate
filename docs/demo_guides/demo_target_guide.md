@@ -14,10 +14,15 @@ The Target VM is responsible for hosting the Redis Database, the FastAPI Middlew
 **Option A: Automated Startup (If using PowerShell / Windows Host)**
 1. Open PowerShell in the project root directory.
 2. Run the script:
-   ```powershell
-   .\start_all.ps1
-   ```
-   *(This script automatically opens separate windows for Redis, the Target Server, the Backend, and the Frontend).*
+   * **Standard HTTP Mode:**
+     ```powershell
+     .\start_all.ps1
+     ```
+   * **Secure HTTPS / SSL Mode:**
+     ```powershell
+     .\start_all.ps1 -Https
+     ```
+   *(This script automatically opens separate windows for Redis, the Target Server, the Backend, and the Frontend. In HTTPS mode, it automatically configures local SSL certificates and secure WebSockets).*
 
 **Option B: Manual Startup (If using strict Ubuntu Terminal)**
 
@@ -39,7 +44,11 @@ cd ~/sentirate/dashboard/backend
 source venv/bin/activate
 
 # Start the server (Explicitly binding to 0.0.0.0 to allow network traffic)
+# For HTTP:
 DASHBOARD_HOST=0.0.0.0 DASHBOARD_PORT=8050 python main.py
+
+# For HTTPS:
+USE_HTTPS=true DASHBOARD_HOST=0.0.0.0 DASHBOARD_PORT=8050 python main.py
 ```
 *Note: The backend must be running for the dashboard to receive data.*
 

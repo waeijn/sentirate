@@ -223,3 +223,11 @@ dashboard/frontend/.vite/
 # Ad-hoc debug/demo output
 demo_log_output.json
 sigma_demo.json
+
+# SSL / TLS certificates
+certs/
+*.pem
+*.key
+*.crt
+.env.local
+dashboard/frontend/.env.local

@@ -16,15 +16,25 @@ Open your terminal and navigate to the traffic generation directory:
 cd ~/sentirate/experiments/traffic_generation
 ```
 
+> **HTTP vs. HTTPS Protocol Note:**
+> * For **HTTP** target: use `http://YOUR_TARGET_IP:8050`
+> * For **HTTPS** target: use `https://YOUR_TARGET_IP:8050` and add `-k` to curl commands to bypass self-signed certificate checks (`curl -k -X DELETE ...`).
+
 ---
 
 ## 2. Run Isolated Normal Traffic
 ```bash
 # Step A: Reset the Target's backend memory
+# HTTP:
 curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+# HTTPS:
+curl -k -X DELETE https://YOUR_TARGET_IP:8050/api/clients
 
 # Step B: Run Normal profile (3 minutes, 250 users)
+# HTTP:
 locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m NormalUser
+# HTTPS:
+locust -f locust_scripts/locust_scenarios.py --host https://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m NormalUser
 ```
 
 ---
@@ -32,10 +42,14 @@ locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 -
 ## 3. Run Isolated Bursty Traffic
 ```bash
 # Step A: Reset backend memory
-curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+# HTTP:  curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+# HTTPS: curl -k -X DELETE https://YOUR_TARGET_IP:8050/api/clients
 
 # Step B: Run Bursty profile (3 minutes, 250 users)
+# HTTP:
 locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m BurstyUser
+# HTTPS:
+locust -f locust_scripts/locust_scenarios.py --host https://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m BurstyUser
 ```
 
 ---
@@ -43,10 +57,14 @@ locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 -
 ## 4. Run Volumetric Attack (Suspicious)
 ```bash
 # Step A: Reset backend memory
-curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+# HTTP:  curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+# HTTPS: curl -k -X DELETE https://YOUR_TARGET_IP:8050/api/clients
 
 # Step B: Run Suspicious profile (3 minutes, 250 users)
+# HTTP:
 locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m SuspiciousUser
+# HTTPS:
+locust -f locust_scripts/locust_scenarios.py --host https://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m SuspiciousUser
 ```
 
 ---
@@ -54,8 +72,12 @@ locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 -
 ## 5. Run Mixed Trial (All Profiles Concurrently)
 ```bash
 # Step A: Reset backend memory
-curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+# HTTP:  curl -X DELETE http://YOUR_TARGET_IP:8050/api/clients
+# HTTPS: curl -k -X DELETE https://YOUR_TARGET_IP:8050/api/clients
 
 # Step B: Run Mixed Traffic simulation (Leaves off profile name to run all)
+# HTTP:
 locust -f locust_scripts/locust_scenarios.py --host http://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m
+# HTTPS:
+locust -f locust_scripts/locust_scenarios.py --host https://YOUR_TARGET_IP:8050 --headless -u 250 -r 10 -t 3m
 ```

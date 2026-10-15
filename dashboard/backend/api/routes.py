@@ -175,7 +175,7 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
         return {
             "thresholds": {
                 "normal_rate_max":    middleware.NORMAL_RATE_MAX,
-                "bursty_rate_max":    30.0, # deprecated
+                "bursty_rate_max":    middleware.LAMBDA_BURSTY_MAX,
                 "suspicious_sigma":   middleware.SUSPICIOUS_SIGMA,
                 "suspicious_burst":   middleware.SUSPICIOUS_BURST,
                 "suspicious_persist": middleware.SUSPICIOUS_PERSIST,
@@ -184,6 +184,8 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
             },
             "profiles": {
                 "normal": {"capacity": middleware.BUCKET_PROFILES["normal"][0], "refill_rate": middleware.BUCKET_PROFILES["normal"][1]},
+                "bursty": {"capacity": middleware.BUCKET_PROFILES["bursty"][0], "refill_rate": middleware.BUCKET_PROFILES["bursty"][1]},
+                "suspicious": {"capacity": middleware.BUCKET_PROFILES["suspicious"][0], "refill_rate": middleware.BUCKET_PROFILES["suspicious"][1]},
                 "bursty_legitimate": {"capacity": middleware.BUCKET_PROFILES["bursty"][0], "refill_rate": middleware.BUCKET_PROFILES["bursty"][1]},
                 "suspicious_abusive": {"capacity": middleware.BUCKET_PROFILES["suspicious"][0], "refill_rate": middleware.BUCKET_PROFILES["suspicious"][1]},
             },
@@ -195,8 +197,6 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
         """
         Dynamically applies updated thresholds and token bucket profiles.
         """
-        from core import middleware
-        
         if not (config.suspicious_refill < config.normal_refill < config.bursty_refill):
             return JSONResponse(
                 status_code = 422,
@@ -207,14 +207,19 @@ def create_router(limiter: AdaptiveRateLimiter) -> APIRouter:
                 status_code = 422,
                 content     = {"error": "Constraint 5 violated: suspicious_capacity < normal_capacity < bursty_capacity"},
             )
- 
-        middleware.NORMAL_RATE_MAX  = config.normal_rate_max
-        middleware.SUSPICIOUS_SIGMA = config.suspicious_sigma
- 
-        middleware.BUCKET_PROFILES["normal"]     = (config.normal_capacity, config.normal_refill)
-        middleware.BUCKET_PROFILES["bursty"]     = (config.bursty_capacity, config.bursty_refill)
-        middleware.BUCKET_PROFILES["suspicious"] = (config.suspicious_capacity, config.suspicious_refill)
- 
+
+        updated = await limiter.update_runtime_config(
+            normal_rate_max     = config.normal_rate_max,
+            bursty_rate_max     = config.bursty_rate_max,
+            suspicious_sigma    = config.suspicious_sigma,
+            normal_capacity     = config.normal_capacity,
+            normal_refill       = config.normal_refill,
+            bursty_capacity     = config.bursty_capacity,
+            bursty_refill       = config.bursty_refill,
+            suspicious_capacity = config.suspicious_capacity,
+            suspicious_refill   = config.suspicious_refill,
+        )
+
         return {
             "status":  "applied",
             "message": "Configuration updated — changes are active immediately.",

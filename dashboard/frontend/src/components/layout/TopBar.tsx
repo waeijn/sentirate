@@ -1,55 +1,71 @@
 interface TopBarProps {
-  title: string;
+  breadcrumbs?: string[];
+  title?: string;
   connected: boolean;
   onResetState?: () => void;
 }
 
 export function TopBar({
+  breadcrumbs,
   title,
   connected,
   onResetState,
 }: TopBarProps) {
+  // Use explicit breadcrumbs if provided, else construct from title
+  const crumbs = breadcrumbs && breadcrumbs.length > 0
+    ? breadcrumbs
+    : ["Dashboard", title || "Overview"];
+
   return (
     <header
       style={{
-        height: 52,
+        height: 60,
+        boxSizing: "border-box",
         background: "var(--glass-bg)",
-        borderBottom: "1px solid var(--glass-border)",
+        borderBottom: "1px solid var(--border)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 24px",
+        padding: "0 clamp(14px, 2vw, 24px)",
         flexShrink: 0,
         backdropFilter: "var(--glass-blur)",
         WebkitBackdropFilter: "var(--glass-blur)",
         zIndex: 5,
+        gap: 12,
       }}
     >
-      {/* Title */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span
-          style={{
-            fontSize: 22,
-            fontWeight: 800,
-            color: "var(--text)",
-            letterSpacing: "-0.02em",
-            fontFamily: "var(--font-display)",
-          }}
-        >
-          SentiRate
-        </span>
-        <span
-          style={{
-            fontSize: 14,
-            fontWeight: 500,
-            color: "var(--text-muted)",
-            letterSpacing: "0.01em",
-            fontFamily: "var(--font-display)",
-          }}
-        >
-          {title}
-        </span>
-      </div>
+      {/* Breadcrumbs Navigation */}
+      <nav aria-label="Breadcrumb" style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", minWidth: 0 }}>
+        {crumbs.map((crumb, idx) => {
+          const isLast = idx === crumbs.length - 1;
+          return (
+            <span key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {idx > 0 && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-dim)",
+                    userSelect: "none",
+                  }}
+                >
+                  /
+                </span>
+              )}
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: isLast ? 600 : 500,
+                  color: isLast ? "var(--text)" : "var(--text-muted)",
+                  fontFamily: "var(--font-display)",
+                  letterSpacing: isLast ? "-0.01em" : "0.01em",
+                }}
+              >
+                {crumb}
+              </span>
+            </span>
+          );
+        })}
+      </nav>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         {/* Connection status — matches Figma green dot + "System Online" */}

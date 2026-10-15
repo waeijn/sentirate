@@ -3,9 +3,15 @@
 
 Write-Host "Stopping SentiRate services..." -ForegroundColor Cyan
 
-# 1. Stop Redis Container
-Write-Host "Stopping Redis container..." -ForegroundColor Yellow
-docker stop rate-limiter-redis
+# 1. Stop & Remove Redis Container
+Write-Host "Stopping and removing Redis container..." -ForegroundColor Yellow
+$container = docker ps -a -q -f name="rate-limiter-redis" 2>$null
+if ($container) {
+    docker rm -f rate-limiter-redis | Out-Null
+    Write-Host "Redis container removed from Docker Desktop." -ForegroundColor Green
+} else {
+    Write-Host "No active Redis container found." -ForegroundColor DarkGray
+}
 
 # Function to kill a process by its port
 function Kill-ProcessByPort {
