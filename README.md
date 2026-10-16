@@ -12,8 +12,10 @@ The system addresses the gap in traditional static rate limiting by utilizing **
 ## Key Features
 * **Heuristic Classification Engine:** Categorizes API traffic into `normal`, `bursty`, and `suspicious` profiles based on request rate ($\lambda$), interval regularity ($\sigma$), and burst persistence.
 * **Dynamic Parameter Optimization:** Automatically adjusts the Token Bucket refill rate ($R$) and bucket capacity ($C$) based on real-time classification output.
+* **Dynamic Runtime Configuration:** Real-time reconfiguration of heuristic thresholds and bucket parameters via the Web Dashboard or REST API (`GET`/`PUT /api/config`) with atomic Redis Lua synchronization and zero downtime.
 * **Inline Hardware Fast Gate:** A 1-second strict rolling window that instantly catches extreme floods (>30 RPS) before they reach the main algorithm, preventing race-condition bypasses.
-* **Visual Traffic Dashboard:** A real-time React-based dashboard providing analytics on System Throughput, Request Acceptance Rate (RAR), and False Positive/Negative Rates.
+* **Visual Traffic Dashboard:** A real-time React-based dashboard providing analytics on System Throughput, Request Acceptance Rate (RAR), and False Positive/Negative Rates with full responsive mobile/tablet support.
+* **End-to-End SSL/HTTPS Support:** Out-of-the-box TLS support across the FastAPI backend, secure WebSockets (`wss://`), and frontend proxy, with automated certificate auto-detection.
 * **Resource Efficiency:** Specifically designed for resource-constrained environments, prioritizing lightweight rule-based logic over computationally intensive machine learning models.
 
 ## System Architecture
@@ -44,8 +46,12 @@ The system follows an **Input-Process-Output (IPO)** framework, decoupling the s
 ```bash
 cd dashboard/backend
 poetry install
-# Start the FastAPI + Socket.IO server on port 8050
+
+# Start in HTTP mode (port 8050)
 WORKERS=4 DASHBOARD_HOST=0.0.0.0 DASHBOARD_PORT=8050 poetry run python main.py
+
+# Or start in secure HTTPS mode
+USE_HTTPS=true WORKERS=4 DASHBOARD_HOST=0.0.0.0 DASHBOARD_PORT=8050 poetry run python main.py
 ```
 
 ### 2. Starting the Visual Dashboard
@@ -54,9 +60,14 @@ cd dashboard/frontend
 npm install
 npm run dev -- --host 0.0.0.0
 ```
-*The dashboard will be available at `http://localhost:5173`.*
+*The dashboard will be available at `http://localhost:5173` (or `https://localhost:5173` in HTTPS mode).*
 
-> **Note for Windows Users:** You can optionally run the `start_all.ps1` script in the root directory to automatically launch the Redis container, the FastAPI backend, and the React frontend simultaneously in separate windows.
+> **Tip for Windows Users:** You can use the included root scripts to manage all services at once:
+> - **Standard HTTP:** `.\start_all.ps1`
+> - **Secure HTTPS:** `.\start_all.ps1 -Https`
+> - **Clean Shutdown:** `.\stop_all.ps1` (terminates all services and cleans up Docker)
+>
+> For full operational details, multi-device LAN testing, and REST API docs, consult the [Operations Runbook](RUNBOOK.md).
 
 ---
 
